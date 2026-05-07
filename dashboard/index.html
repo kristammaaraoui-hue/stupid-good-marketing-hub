@@ -3675,23 +3675,25 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
 
     window._currentDesigns = designs;
 
-    const cards = designs.map((d,i) => `
+    const cards = designs.map((d,i) => {
+      const tid = d.canva_template_id || '';
+      const thumb = novaTemplateMockup(tid, d.headline, d.subtext, d.mood);
+      return `
       <div class="design-card" id="dc-${i+1}" style="animation-delay:${i*0.07}s">
-        <div class="dc-thumb" style="position:relative;background:linear-gradient(135deg,#1a2535,#0d1520);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:6px;">
-          <div style="font-size:13px;font-weight:900;color:#00D191;line-height:1.2;">${d.headline}</div>
-          ${d.subtext ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);line-height:1.3;">${d.subtext}</div>` : ''}
-          <div style="position:absolute;bottom:8px;left:8px;right:8px;font-size:9px;color:rgba(255,255,255,0.35);text-align:left;line-height:1.3;">${d.colorScheme}</div>
-          <div style="position:absolute;top:8px;right:8px;background:rgba(0,209,145,0.2);border-radius:5px;padding:3px 7px;font-size:10px;color:#00D191;font-weight:700;">Option ${i+1}</div>
+        <div class="dc-thumb" style="position:relative;overflow:hidden;">${thumb}
+          <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.55);border-radius:5px;padding:3px 7px;font-size:10px;color:#fff;font-weight:700;backdrop-filter:blur(4px);">Option ${i+1}</div>
         </div>
         <div class="dc-info">
           <div class="dc-name">${d.mood}</div>
+          <div class="dc-sub" style="font-size:10.5px;color:var(--purple);margin-bottom:4px;font-weight:600;">${d.template_name || 'Nova\'s choice'}</div>
           <div class="dc-sub">${d.layout}</div>
           <div class="dc-actions">
             <button class="ocbtn ocbtn-approve" style="font-size:11px;" onclick="createCanvaDesign(${i})">✓ Create in Canva</button>
             <button class="ocbtn ocbtn-design" style="font-size:11px;" onclick="editDesign(${i+1})">✎ Edit Brief</button>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     document.getElementById('pixelOutput').innerHTML = `
       <div class="out-header">
@@ -3699,13 +3701,67 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
         <div class="out-meta">${railState.pd} · StupidGood brand kit · Click "Create in Canva" to generate</div>
       </div>
       <div class="design-grid">${cards}</div>
-      <div id="designEditPanel" style="display:none;"></div>
-      <div id="pixelInlineQA" style="margin-top:20px;"></div>`;
-    renderGraphicQA('pixelInlineQA');
+      <div id="designEditPanel" style="display:none;"></div>`;
     toast('4 design directions ready — click "Create in Canva" to build', 'var(--purple)');
   } catch(e) {
     document.getElementById('pixelOutput').innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px;">⚠ ${e.message}</div>`;
   }
+}
+
+function novaTemplateMockup(templateId, headline, subtext, mood) {
+  // Restaurant call out styles (full-bleed photo bg with text overlay)
+  const photoOverlay = ['DAHI_nPH0aQ','DAHI_mCB3ss','DAHI_qe2TME','DAHI_t5xq5U','DAHI_mrrsag'];
+  // Multiple locations
+  const multiLoc = ['DAHI_szSaio','DAHI_tuoKgE'];
+  // List
+  const listStyle = ['DAHI_gGWC7w'];
+  // Opinion / white card
+  const opinion = ['DAHI_r7B0tk'];
+
+  const hl = (headline||'').slice(0,28);
+  const sub = (subtext||'').slice(0,36);
+
+  if (photoOverlay.includes(templateId)) {
+    const isMenuItem = templateId === 'DAHI_mrrsag';
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a1208,#2a1a0a,#0d1a0d);display:flex;flex-direction:column;justify-content:flex-end;padding:14px;min-height:160px;">
+      <div style="position:absolute;inset:0;background:url('') center/cover;opacity:0.18;"></div>
+      ${isMenuItem ? `<div style="position:absolute;top:14px;left:14px;right:14px;background:rgba(255,255,255,0.07);border-radius:6px;height:70px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,0.3);">[ dish photo ]</div>` : ''}
+      <div style="position:relative;">
+        <div style="display:inline-block;border:1px solid rgba(255,255,255,0.5);padding:2px 7px;font-size:8px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;">CITY</div>
+        <div style="font-size:13px;font-weight:900;color:#fff;line-height:1.2;margin-bottom:3px;">${hl}</div>
+        ${sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.6);">${sub}</div>` : ''}
+      </div>
+      <div style="position:absolute;bottom:10px;right:10px;width:16px;height:16px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+    </div>`;
+  }
+  if (multiLoc.includes(templateId)) {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:7px;min-height:160px;">
+      ${[1,2].map(n => `<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;background:rgba(255,255,255,0.08);border-radius:4px;flex-shrink:0;"></div><div><div style="font-size:9px;font-weight:700;color:#fff;opacity:${n===1?1:0.6};">${n===1?hl:'Location '+n}</div><div style="font-size:8px;color:rgba(255,255,255,0.4);">City · Neighborhood</div></div></div>`).join('')}
+      <div style="position:absolute;bottom:10px;right:10px;width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+    </div>`;
+  }
+  if (listStyle.includes(templateId)) {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:5px;min-height:160px;">
+      <div style="font-size:10px;font-weight:800;color:#00d191;margin-bottom:4px;">${hl}</div>
+      ${[1,2,3].map(n=>`<div style="display:flex;align-items:center;gap:7px;"><div style="width:16px;height:16px;border-radius:50%;background:${n===1?'#f254fd':n===2?'#00d191':'rgba(255,255,255,0.15)'};display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:#000;flex-shrink:0;">${n}</div><div style="height:6px;background:rgba(255,255,255,${n===1?'0.4':n===2?'0.25':'0.12'});border-radius:3px;flex:1;"></div></div>`).join('')}
+      <div style="position:absolute;bottom:10px;right:10px;width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+    </div>`;
+  }
+  if (opinion.includes(templateId)) {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;padding:14px;min-height:160px;">
+      <div style="background:#fff;border-radius:10px;padding:14px;width:100%;text-align:center;">
+        <div style="font-size:11px;font-weight:900;color:#393939;line-height:1.3;margin-bottom:8px;">${hl}</div>
+        <div style="height:40px;background:#f0f0f0;border-radius:6px;margin-bottom:8px;"></div>
+        ${sub ? `<div style="font-size:8px;color:#888;">${sub}</div>` : ''}
+      </div>
+    </div>`;
+  }
+  // Nova's choice / fallback
+  return `<div style="width:100%;height:100%;background:linear-gradient(135deg,#1a0a2e,#2a0a3e);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:6px;min-height:160px;">
+    <div style="font-size:13px;font-weight:900;color:#f254fd;line-height:1.2;">${hl}</div>
+    ${sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.5);">${sub}</div>` : ''}
+    <div style="font-size:8px;color:rgba(255,255,255,0.3);margin-top:4px;">Nova's choice</div>
+  </div>`;
 }
 
 function createCanvaDesign(idx) {
