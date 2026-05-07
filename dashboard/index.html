@@ -391,6 +391,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
 /* JAX REVIEW QUEUE */
 .jax-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:12px; transition:border-color 0.15s; }
 .jax-card:hover { border-color:rgba(255,40,31,0.3); }
+.jax-card-hot { border-color:rgba(255,40,31,0.35); background:linear-gradient(135deg, var(--card) 0%, rgba(255,40,31,0.03) 100%); }
 .jax-card-meta { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
 .jax-handle { font-size:12px; font-weight:700; color:var(--text); }
 .jax-time { font-size:11px; color:var(--muted2); }
@@ -5665,12 +5666,14 @@ async function loadJaxQueue() {
     const res = await fetch(url);
     if (!res.ok) throw new Error('API error ' + res.status);
     const data = await res.json();
-    const rows = parseJaxApiResponse(data).filter(r => r.status === 'pending');
+    const rows = parseJaxApiResponse(data)
+      .filter(r => r.status === 'pending')
+      .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
       el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies. JAX will surface new opportunities on the next n8n scan.</div></div>';
     } else {
-      if (status) status.textContent = rows.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies');
+      if (status) status.textContent = rows.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies') + ' · sorted by engagement';
       el.innerHTML = rows.map(r => renderJaxCard(r)).join('');
     }
   } catch(e) {
@@ -5682,11 +5685,20 @@ async function loadJaxQueue() {
 function renderJaxCard(row) {
   const sid = 'jc_' + row.tweet_id.replace(/\W/g,'_');
   const charCount = (row.draft_reply || '').length;
-  return `<div class="jax-card" id="${sid}">
+  const score = parseInt(row.engagement_score) || 0;
+  const isHigh = score >= 20;
+  const engagementHtml = score > 0
+    ? `<span style="font-size:10.5px;color:var(--muted);display:flex;align-items:center;gap:4px;">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        ${score} engagement
+       </span>`
+    : '';
+  return `<div class="jax-card${isHigh ? ' jax-card-hot' : ''}" id="${sid}">
     <div class="jax-card-meta">
       <span class="jax-handle">@${row.tweet_author || 'unknown'}</span>
       <span class="jax-time">${row.created_at || ''}</span>
-      <span class="jax-badge pending" id="${sid}_badge">Pending</span>
+      ${isHigh ? '<span class="jax-badge" style="background:rgba(255,40,31,0.12);color:var(--red);">High Engagement</span>' : '<span class="jax-badge pending" id="'+sid+'_badge">Pending</span>'}
+      ${engagementHtml}
       ${row.tweet_url ? `<a href="${row.tweet_url}" target="_blank" class="jax-link">View on X ↗</a>` : ''}
     </div>
     <div class="jax-tweet">${row.tweet_text || ''}</div>
