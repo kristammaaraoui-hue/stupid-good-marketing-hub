@@ -3659,10 +3659,13 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
     );
 
     let designs;
+    // Strip code fence if present (handle missing closing fence with |$)
     let jsonStr = raw;
-    const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlock) jsonStr = codeBlock[1];
-    else { const arr = raw.match(/\[[\s\S]*\]/); if (arr) jsonStr = arr[0]; }
+    const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)(?:\s*```|$)/);
+    if (codeBlock && codeBlock[1].includes('[')) jsonStr = codeBlock[1].trim();
+    // Always extract the JSON array portion (strips any trailing text after ])
+    const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
+    if (arrMatch) jsonStr = arrMatch[0];
     try {
       designs = JSON.parse(jsonStr);
     } catch(parseErr) {
@@ -5727,7 +5730,7 @@ async function loadJaxQueue() {
     const text = await res.text();
     if (text.includes('<!DOCTYPE') || text.includes('<html')) throw new Error('not-published');
     const rows = parseJaxCSV(text)
-      .filter(r => r.status === 'pending')
+      .filter(r => r.status === 'pending' || r.status === 'pending_review')
       .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
@@ -6716,7 +6719,7 @@ function renderScoutIntel() {
   }
   // Fall back to static SCOUT_INTEL data
   if (feed.innerHTML.trim()) return;
-  feed.innerHTML = SCOUT_INTEL.map(item => `
+  feed.innerHTML = SCOUT_INTEL.map((item, i) => `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         ${platBadge(item.platform === 'newsletter' ? 'blog' : item.platform, 18)}
