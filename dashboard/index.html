@@ -3578,7 +3578,16 @@ function renderBulkOutput(count, platforms, realPosts) {
 // ── DESIGN BRIDGE ─────────────────────────────────────────────────────────────
 
 function sendToPixel(copy) {
-  document.getElementById('pixelBrief').value = copy;
+  // Strip Instagram footer (standalone dots, 📍 location line, hashtags) — not useful as a design brief
+  const cleaned = copy
+    .split('\n')
+    .filter(line => {
+      const t = line.trim();
+      return t !== '.' && !t.startsWith('#') && !t.startsWith('📍');
+    })
+    .join('\n')
+    .trim();
+  document.getElementById('pixelBrief').value = cleaned;
   const pre = document.getElementById('pixelPrefill');
   pre.style.display = 'flex';
   document.getElementById('pixelPrefillText').textContent = 'Copy pre-filled from COPY agent';
@@ -3651,7 +3660,10 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
 
     let designs;
     try {
-      const jsonStr = raw.match(/\[[\s\S]*\]/)?.[0] || raw;
+      let jsonStr = raw;
+      const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlock) jsonStr = codeBlock[1];
+      else { const arr = raw.match(/\[[\s\S]*\]/); if (arr) jsonStr = arr[0]; }
       designs = JSON.parse(jsonStr);
     } catch {
       throw new Error('Could not parse design options. Try again.');
