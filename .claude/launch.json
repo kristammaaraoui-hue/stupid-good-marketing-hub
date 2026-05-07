@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "stupid-good-dashboard",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "3737", "--directory", "/Users/kristamaaraoui/Desktop/Stupid Good Brand Guide"],
+      "port": 3737
+    }
+  ]
+}
