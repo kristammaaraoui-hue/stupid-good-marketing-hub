@@ -1171,14 +1171,14 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <div style="margin-bottom:12px;">
             <div class="ic-label" style="margin-bottom:7px;">Assets <span style="font-weight:400;color:var(--muted2);font-size:9px;text-transform:none;letter-spacing:normal;">(optional)</span></div>
             <div style="display:flex;gap:8px;">
-              <label class="upload-zone" id="bgZone" title="Upload background photo">
-                <input type="file" id="bgImageInput" accept="image/*" style="display:none" onchange="handleAssetUpload('bg',this)">
+              <label class="upload-zone" id="bgZone" title="Upload background photos">
+                <input type="file" id="bgImageInput" accept="image/*" multiple style="display:none" onchange="handleAssetUpload('bg',this)">
                 <div id="bgEmpty" style="display:flex;flex-direction:column;align-items:center;gap:4px;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--muted2)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  <span class="upload-zone-lbl">Background Photo</span>
-                  <span class="upload-zone-sub">Click to upload</span>
+                  <span class="upload-zone-lbl">Background Photos</span>
+                  <span class="upload-zone-sub">Click to upload (multiple ok)</span>
                 </div>
-                <img id="bgThumb" class="upload-thumb" style="display:none" alt="">
+                <div id="bgThumbs" style="display:none;width:100%;display:none;flex-wrap:wrap;gap:4px;justify-content:center;"></div>
                 <button class="upload-clear" id="bgClear" style="display:none" onclick="clearAsset(event,'bg')">×</button>
               </label>
               <label class="upload-zone" id="logoZone" title="Upload restaurant logo">
@@ -2348,7 +2348,7 @@ const DRAFT_TWEETS = [
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 
-let railState = { rp:'all', rf:'Post', pd:'Instagram', po:'templates', ps:'Social Post', df:'How-To Guide', dl:'~800 words', bgImage:null, logoImage:null, pt:'auto' };
+let railState = { rp:'all', rf:'Post', pd:'Instagram', po:'templates', ps:'Social Post', df:'How-To Guide', dl:'~800 words', bgImages:[], logoImage:null, pt:'auto' };
 let copyScale = '1';
 let qFilter = 'all';
 
@@ -3148,30 +3148,65 @@ function setPixelTemplate(val) {
 }
 
 function handleAssetUpload(type, input) {
-  const file = input.files[0];
-  if (!file) return;
   const isBg = type === 'bg';
-  const reader = new FileReader();
-  reader.onload = e => {
-    railState[isBg ? 'bgImage' : 'logoImage'] = { name: file.name, dataUrl: e.target.result };
-    document.getElementById(isBg ? 'bgThumb' : 'logoThumb').src = e.target.result;
-    document.getElementById(isBg ? 'bgThumb' : 'logoThumb').style.display = 'block';
-    document.getElementById(isBg ? 'bgEmpty' : 'logoEmpty').style.display = 'none';
-    document.getElementById(isBg ? 'bgClear' : 'logoClear').style.display = 'flex';
-  };
-  reader.readAsDataURL(file);
+  if (isBg) {
+    const files = Array.from(input.files);
+    if (!files.length) return;
+    const thumbsEl = document.getElementById('bgThumbs');
+    const emptyEl = document.getElementById('bgEmpty');
+    const clearEl = document.getElementById('bgClear');
+    let loaded = 0;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        railState.bgImages.push({ name: file.name, dataUrl: e.target.result });
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.style.cssText = 'width:36px;height:36px;object-fit:cover;border-radius:5px;flex-shrink:0;';
+        thumbsEl.appendChild(img);
+        loaded++;
+        if (loaded === 1) {
+          thumbsEl.style.display = 'flex';
+          emptyEl.style.display = 'none';
+          clearEl.style.display = 'flex';
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  } else {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      railState.logoImage = { name: file.name, dataUrl: e.target.result };
+      document.getElementById('logoThumb').src = e.target.result;
+      document.getElementById('logoThumb').style.display = 'block';
+      document.getElementById('logoEmpty').style.display = 'none';
+      document.getElementById('logoClear').style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+  }
 }
 
 function clearAsset(e, type) {
   e.preventDefault();
   e.stopPropagation();
-  const isBg = type === 'bg';
-  railState[isBg ? 'bgImage' : 'logoImage'] = null;
-  document.getElementById(isBg ? 'bgThumb' : 'logoThumb').src = '';
-  document.getElementById(isBg ? 'bgThumb' : 'logoThumb').style.display = 'none';
-  document.getElementById(isBg ? 'bgEmpty' : 'logoEmpty').style.display = 'flex';
-  document.getElementById(isBg ? 'bgClear' : 'logoClear').style.display = 'none';
-  document.getElementById(isBg ? 'bgImageInput' : 'logoImageInput').value = '';
+  if (type === 'bg') {
+    railState.bgImages = [];
+    const thumbsEl = document.getElementById('bgThumbs');
+    thumbsEl.innerHTML = '';
+    thumbsEl.style.display = 'none';
+    document.getElementById('bgEmpty').style.display = 'flex';
+    document.getElementById('bgClear').style.display = 'none';
+    document.getElementById('bgImageInput').value = '';
+  } else {
+    railState.logoImage = null;
+    document.getElementById('logoThumb').src = '';
+    document.getElementById('logoThumb').style.display = 'none';
+    document.getElementById('logoEmpty').style.display = 'flex';
+    document.getElementById('logoClear').style.display = 'none';
+    document.getElementById('logoImageInput').value = '';
+  }
 }
 
 function updateHints() {
@@ -3645,7 +3680,7 @@ function createCanvaDesign(idx) {
     `Color scheme: ${d.colorScheme}`,
     `Photo: ${d.photoNote}`,
     `Mood: ${d.mood}`,
-    railState.bgImage ? `Background image: "${railState.bgImage.name}" — user has uploaded this file; use it as the background (replace any stock photo in the template).` : null,
+    railState.bgImages?.length ? `Background photos (${railState.bgImages.length} uploaded): ${railState.bgImages.map(f=>f.name).join(', ')} — use these as background images; replace any stock photo in the template.` : null,
     railState.logoImage ? `Restaurant logo: "${railState.logoImage.name}" — user has uploaded this file; place it in the design instead of or alongside the brand logo.` : null
   ].filter(Boolean).join('\n');
 
