@@ -1148,9 +1148,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <span class="scale-label">Options</span>
             <div class="scale-chips" id="pixelOptChips">
               <div class="sc on" id="po-tpl" onclick="setPixelOpt('templates',this)">My templates</div>
-              <div class="sc" id="po-photo" onclick="setPixelOpt('photo',this)">With photo</div>
-              <div class="sc" id="po-text" onclick="setPixelOpt('text',this)">Text only</div>
-              <div class="sc" id="po-placeholder" onclick="setPixelOpt('placeholder',this)">Placeholder</div>
+              <div class="sc" id="po-free" onclick="setPixelOpt('free',this)">Nova's choice</div>
             </div>
           </div>
           <!-- TEMPLATE -->
@@ -3581,8 +3579,8 @@ PHOTO RULES:
 - All other posts → free Unsplash images (specify the exact search terms to use)
 - If a required image cannot be sourced or confirmed, use a clearly labeled placeholder (e.g. "[PHOTO PLACEHOLDER — insert restaurant photo here]") — do not block the brief. The user will insert the image manually.
 
-Return ONLY a JSON array of 4 design brief objects. Each object must have: "headline" (short, punchy), "subtext" (optional supporting line), "canva_template_id" (the Canva design ID from the list above), "template_name" (the human-readable template name), "layout" (specific placement instructions), "colorScheme" (which brand colors go where), "photoNote" (what photo to use and where to source it), "mood" (e.g. "Dark and authoritative").`,
-      `Create 4 distinct design directions for a ${railState.pd} graphic.\nBrief: ${brief}${railState.pt !== 'auto' ? `\nForce all 4 directions to use this exact template — canva_template_id must be "${railState.pt}" for every object.` : ''}\nReturn as JSON array: [{"headline":"...","subtext":"...","layout":"...","colorScheme":"...","mood":"..."},...]`
+Return ONLY a JSON array of 4 design brief objects. Each object must have: "headline" (short, punchy), "subtext" (optional supporting line), ${railState.po === 'free' ? '"canva_template_id": null, "template_name": "Nova\'s choice"' : '"canva_template_id" (the Canva design ID from the list above), "template_name" (the human-readable template name)'}, "layout" (specific placement instructions), "colorScheme" (which brand colors go where), "photoNote" (what photo to use and where to source it), "mood" (e.g. "Dark and authoritative").${railState.po === 'free' ? ' Since this is a free-range design, set canva_template_id to null and describe a fully custom layout — do not reference the templates above.' : ''}`,
+      `Create 4 distinct design directions for a ${railState.pd} graphic.\nBrief: ${brief}${railState.pt !== 'auto' ? `\nForce all 4 directions to use this exact template — canva_template_id must be "${railState.pt}" for every object.` : ''}${railState.po === 'free' ? '\nThis is a "Nova\'s choice" design — ignore the template list and design freely using brand colors and fonts only. Set canva_template_id to null.' : ''}\nReturn as JSON array: [{"headline":"...","subtext":"...","layout":"...","colorScheme":"...","mood":"..."},...]`
     );
 
     let designs;
@@ -3640,7 +3638,7 @@ function createCanvaDesign(idx) {
 
   window._novaBrief = [
     `Create a ${railState.ps} (${size}) in Canva using the StupidGood brand kit (ID: kAHG8RvIyVQ).`,
-    d.canva_template_id ? `Base template: "${d.template_name}" (Canva design ID: ${d.canva_template_id}) — edit this design, do not create from scratch.` : null,
+    d.canva_template_id ? `Base template: "${d.template_name}" (Canva design ID: ${d.canva_template_id}) — edit this design, do not create from scratch.` : `Design style: Nova's choice — create from scratch using only brand colors (#f254fd, #00d191, #393939, #ffffff) and fonts (Foun for headlines, Open Sauce for body). No template required.`,
     `Headline: "${d.headline}"`,
     d.subtext ? `Subtext: "${d.subtext}"` : null,
     `Layout: ${d.layout}`,
