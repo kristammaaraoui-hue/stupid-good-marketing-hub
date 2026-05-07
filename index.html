@@ -3659,18 +3659,15 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
     );
 
     let designs;
+    let jsonStr = raw;
+    const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlock) jsonStr = codeBlock[1];
+    else { const arr = raw.match(/\[[\s\S]*\]/); if (arr) jsonStr = arr[0]; }
     try {
-      let jsonStr = raw;
-      const codeBlock = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (codeBlock) jsonStr = codeBlock[1];
-      else { const arr = raw.match(/\[[\s\S]*\]/); if (arr) jsonStr = arr[0]; }
       designs = JSON.parse(jsonStr);
     } catch(parseErr) {
-      console.error('Nova raw response:', raw);
-      console.error('Parse error:', parseErr);
-      const out = document.getElementById('pixelOutput');
-      if (out) out.innerHTML = `<div style="padding:20px;color:var(--red);font-size:12px;"><strong>Parse error — raw response logged to console (F12):</strong><br><br><pre style="white-space:pre-wrap;font-size:11px;color:var(--muted);background:var(--card2);padding:12px;border-radius:8px;max-height:300px;overflow-y:auto;">${(raw||'empty').replace(/</g,'&lt;')}</pre></div>`;
-      throw new Error('Could not parse design options. Try again.');
+      document.getElementById('pixelOutput').innerHTML = `<div style="padding:20px;"><div style="color:var(--red);font-size:12px;font-weight:700;margin-bottom:10px;">Parse error — Nova returned:</div><pre style="white-space:pre-wrap;font-size:11px;color:var(--muted);background:var(--card2);border:1px solid var(--border);padding:12px;border-radius:8px;max-height:300px;overflow-y:auto;">${(raw||'(empty response)').replace(/</g,'&lt;')}</pre></div>`;
+      return;
     }
 
     window._currentDesigns = designs;
