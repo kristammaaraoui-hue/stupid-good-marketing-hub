@@ -6050,8 +6050,14 @@ function renderWeekView() {
   const grid = document.getElementById('calendarGrid');
   if (!grid) return;
 
-  const ANCHOR = new Date(2026, 3, 28);
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Anchor to current Monday so weeks always start on Monday
+  const now2 = new Date();
+  const dow = now2.getDay(); // 0=Sun,1=Mon...
+  const toMon = dow === 0 ? -6 : 1 - dow;
+  const ANCHOR = new Date(now2);
+  ANCHOR.setDate(now2.getDate() + toMon);
+  ANCHOR.setHours(0,0,0,0);
   const weekStart = new Date(ANCHOR);
   weekStart.setDate(ANCHOR.getDate() + calWeekOffset * 7);
 
@@ -6086,7 +6092,7 @@ function renderWeekView() {
   let html = '<div style="display:flex;height:100%;width:100%;">';
   dayNames.forEach((day, di) => {
     const isToday = dayDates[di] === todayStr;
-    const dayPosts = filtered.filter(p => p.day === day && p.date === dayDates[di]).sort((a,b)=>sortTime(a.time)-sortTime(b.time));
+    const dayPosts = filtered.filter(p => p.date === dayDates[di]).sort((a,b)=>sortTime(a.time)-sortTime(b.time));
 
     html += `<div class="cal-col-compact" style="${isToday?'background:rgba(0,209,145,0.018);':''}">
       <div class="cal-col-compact-head" style="${isToday?'border-top-color:var(--green);':''}">
