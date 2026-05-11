@@ -2598,7 +2598,8 @@ async function autoScheduleToBlotato(post) {
   const accountId = BLOTATO_ACCOUNTS[platform];
   if (!accountId) return;
   try {
-    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+    const mediaUrls = await resolveMediaUrls(post);
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
     savePosts([post.id]);
     renderQueue();
@@ -4603,7 +4604,8 @@ async function scheduleAllQ() {
     const accountId = BLOTATO_ACCOUNTS[platform];
     if (!accountId) { skipped++; continue; }
     try {
-      await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+      const mediaUrls = await resolveMediaUrls(post);
+      await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
       const res = { ok: true }; // blotatoFetch throws on failure
       if (!res.ok) { skipped++; continue; }
       post.status = 'scheduled';
@@ -6318,7 +6320,8 @@ async function schedulePipeCard(id, btn) {
   if (!accountId) { toast(`${post.platform} not connected in Blotato`, 'var(--yellow)'); return; }
   if (btn) { btn.textContent = 'Scheduling…'; btn.disabled = true; }
   try {
-    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+    const mediaUrls = await resolveMediaUrls(post);
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
     savePosts([post.id]);
     renderCalendar();
@@ -6584,8 +6587,38 @@ function saveModalEdit(postId) {
   toast('Post saved', 'var(--green)');
 }
 
-function buildBlotatoPayload(post, accountId, platform) {
-  const base = { accountId, platform, text: post.content, mediaUrls: [], useNextFreeSlot: true };
+async function resolveMediaUrls(post) {
+  const src = post.designUrl || post.image || null;
+  if (!src) return [];
+  if (src.startsWith('http')) return [src];
+  if (src.startsWith('data:')) {
+    try {
+      const mimeType = src.match(/:(.*?);/)[1];
+      const byteString = atob(src.split(',')[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      const blob = new Blob([ab], { type: mimeType });
+      const ext = mimeType.split('/')[1] || 'png';
+      const filename = 'post-' + post.id + '.' + ext;
+      const uploadRes = await fetch(SB_URL + '/storage/v1/object/post-images/' + filename, {
+        method: 'POST',
+        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': mimeType, 'x-upsert': 'true' },
+        body: blob
+      });
+      if (uploadRes.ok) {
+        const publicUrl = SB_URL + '/storage/v1/object/public/post-images/' + filename;
+        post.designUrl = publicUrl;
+        savePosts([post.id]);
+        return [publicUrl];
+      }
+    } catch(e) { /* skip image on error */ }
+  }
+  return [];
+}
+
+function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
+  const base = { accountId, platform, text: post.content, mediaUrls, useNextFreeSlot: true };
   if (platform === 'tiktok') {
     Object.assign(base, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
@@ -6610,7 +6643,8 @@ async function schedulePostToBlotato(postId, btn) {
   if (!accountId) { toast(`${post.platform} not connected in Blotato`, 'var(--yellow)'); return; }
   if (btn) { btn.textContent = 'Scheduling…'; btn.disabled = true; }
   try {
-    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+    const mediaUrls = await resolveMediaUrls(post);
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
     savePosts([post.id]);
     if (btn) { btn.innerHTML = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.style.background = 'rgba(0,209,145,0.1)'; }
