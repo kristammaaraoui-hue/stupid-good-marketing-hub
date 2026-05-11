@@ -2596,20 +2596,15 @@ function approvePost(id) {
 async function autoScheduleToBlotato(post) {
   const platform = post.platform === 'x' ? 'twitter' : post.platform;
   const accountId = BLOTATO_ACCOUNTS[platform];
-  if (!accountId) return; // platform not connected, skip silently
+  if (!accountId) return;
   try {
-    const res = await fetch('https://backend.blotato.com/api/v1/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'blotato-api-key': getBlotatoKey() },
-      body: JSON.stringify(buildBlotatoPayload(post, accountId, platform))
-    });
-    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
     post.status = 'scheduled';
     savePosts([post.id]);
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
     updateStats();
-    toast(`Sent to Blotato`, 'var(--green)');
+    toast('Sent to Blotato', 'var(--green)');
   } catch(e) {
     toast(`Approved but Blotato failed: ${e.message}`, 'var(--yellow)');
   }
@@ -4608,11 +4603,8 @@ async function scheduleAllQ() {
     const accountId = BLOTATO_ACCOUNTS[platform];
     if (!accountId) { skipped++; continue; }
     try {
-      const res = await fetch('https://backend.blotato.com/api/v1/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'blotato-api-key': key },
-        body: JSON.stringify({ accountId, platform, text: post.content, mediaUrls: [], useNextFreeSlot: true })
-      });
+      await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+      const res = { ok: true }; // blotatoFetch throws on failure
       if (!res.ok) { skipped++; continue; }
       post.status = 'scheduled';
       sent++;
@@ -4716,6 +4708,18 @@ function getBlotatoKey() {
 
 // Blotato account IDs (Instagram: stupidgood.ai, Twitter: StupidGoodAI)
 const BLOTATO_ACCOUNTS = { instagram: '44276', twitter: '17333', tiktok: '41980' };
+// n8n proxy URL — routes Blotato calls server-side to avoid CORS
+const BLOTATO_PROXY = 'https://stupidgoodai.app.n8n.cloud/webhook/blotato-proxy';
+
+async function blotatoFetch(payload) {
+  const res = await fetch(BLOTATO_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, blotatoKey: getBlotatoKey() })
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
+  return res;
+}
 
 async function scheduleToBlotato(uid) {
   const key = getBlotatoKey();
@@ -4739,15 +4743,7 @@ async function scheduleToBlotato(uid) {
     if (platform === 'tiktok') {
       Object.assign(body, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
-    const res = await fetch('https://backend.blotato.com/api/v1/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'blotato-api-key': key },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
+    await blotatoFetch(body);
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
@@ -6589,12 +6585,7 @@ async function schedulePostToBlotato(postId, btn) {
   if (!accountId) { toast(`${post.platform} not connected in Blotato`, 'var(--yellow)'); return; }
   if (btn) { btn.textContent = 'Scheduling…'; btn.disabled = true; }
   try {
-    const res = await fetch('https://backend.blotato.com/api/v1/posts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'blotato-api-key': key },
-      body: JSON.stringify(buildBlotatoPayload(post, accountId, platform))
-    });
-    if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
     post.status = 'scheduled';
     savePosts([post.id]);
     if (btn) { btn.innerHTML = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.style.background = 'rgba(0,209,145,0.1)'; }
