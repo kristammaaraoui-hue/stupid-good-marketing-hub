@@ -2502,6 +2502,17 @@ function approvePost(id) {
   toastUndo('Post approved', () => { p.status = prev; savePosts(); updateStats(); renderQueue(); renderCommandCenter(); });
 }
 
+function deletePost(id) {
+  const idx = POSTS.findIndex(x => x.id == id);
+  if (idx === -1) return;
+  const removed = POSTS.splice(idx, 1)[0];
+  savePosts();
+  renderQueue();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  updateStats();
+  toastUndo('Post deleted', () => { POSTS.splice(idx, 0, removed); savePosts(); renderQueue(); if (typeof renderCalendar === 'function') renderCalendar(); updateStats(); });
+}
+
 checkDailyAutoGenerate();
 
 // Load saved API keys into settings inputs
@@ -4267,6 +4278,7 @@ function qCard(p) {
       ${isBlog ? `<button class="ocbtn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();previewBlog('${p.id}')">Read</button>` : ''}
       ${p.designUrl ? `<a href="${p.designUrl}" target="_blank" class="ocbtn" style="font-size:10px;padding:3px 8px;text-decoration:none;" onclick="event.stopPropagation()">Design ↗</a>` : ''}
       <button class="ocbtn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();openQueueEdit('${p.id}')">Edit</button>
+      <button class="ocbtn" style="font-size:10px;padding:3px 8px;color:var(--red);border-color:rgba(255,40,31,0.25);" onclick="event.stopPropagation();deletePost('${p.id}')">Delete</button>
     </div>
   </div>`;
 }
@@ -6276,6 +6288,7 @@ function openPostModal(postId) {
     ${approveBtn}
     ${scheduleBtn}
     <button onclick="openQueueEdit('${post.id}');closePostModal();" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">✎ Edit</button>
+    <button onclick="deletePost('${post.id}');closePostModal();" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(255,40,31,0.25);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
     <button onclick="closePostModal()" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">Close</button>
   `;
 
