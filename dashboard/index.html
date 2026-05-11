@@ -1635,10 +1635,16 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <div style="font-size:15px;font-weight:700;">Review Queue</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="jaxQueueStatus">Loading from Google Sheet…</div>
           </div>
-          <button class="genbtn" style="background:var(--card);border:1px solid var(--border2);color:var(--muted);font-size:12px;padding:7px 14px;" onclick="loadJaxQueue()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
-            Refresh
-          </button>
+          <div style="display:flex;gap:8px;">
+            <button class="genbtn" style="background:var(--card);border:1px solid var(--border2);color:var(--muted);font-size:12px;padding:7px 14px;" onclick="exportJaxCSV()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export CSV
+            </button>
+            <button class="genbtn" style="background:var(--card);border:1px solid var(--border2);color:var(--muted);font-size:12px;padding:7px 14px;" onclick="loadJaxQueue()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+              Refresh
+            </button>
+          </div>
         </div>
         <div id="jaxReviewQueue">
           <div style="color:var(--muted);font-size:13px;padding:20px 0;">Loading…</div>
@@ -5737,7 +5743,7 @@ async function loadJaxQueue() {
       el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies. JAX will surface new opportunities on the next n8n scan.</div></div>';
     } else {
       if (status) status.textContent = rows.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies') + ' · sorted by engagement';
-      el.innerHTML = rows.map(r => renderJaxCard(r)).join('');
+      el.innerHTML = rows.map((r, i) => renderJaxCard(r, i + 1, rows.length)).join('');
     }
   } catch(e) {
     if (status) status.textContent = 'Could not load queue';
@@ -5747,7 +5753,38 @@ async function loadJaxQueue() {
   }
 }
 
-function renderJaxCard(row) {
+function formatJaxDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  if (isNaN(d)) return str;
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return time + ' · ' + date;
+}
+
+function exportJaxCSV() {
+  const cards = document.querySelectorAll('.jax-card');
+  if (!cards.length) { toast('Nothing to export', 'var(--muted)'); return; }
+  const rows = [['tweet_id','tweet_author','tweet_text','draft_reply','status','created_at']];
+  cards.forEach(card => {
+    const sid = card.id;
+    const txt = document.getElementById(sid + '_txt');
+    const handle = card.querySelector('.jax-handle')?.textContent?.replace('@','') || '';
+    const tweet = card.querySelector('.jax-tweet')?.textContent || '';
+    const reply = txt?.value || '';
+    const badge = card.querySelector('.jax-badge')?.textContent || '';
+    const time = card.querySelector('.jax-time')?.textContent || '';
+    const id = sid.replace('jc_','');
+    rows.push([id, handle, tweet, reply, badge.toLowerCase(), time].map(v => '"' + String(v).replace(/"/g,'""') + '"'));
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'jax-queue-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+function renderJaxCard(row, cardNum, totalCards) {
   const sid = 'jc_' + row.tweet_id.replace(/\W/g,'_');
   const charCount = (row.draft_reply || '').length;
   const score = parseInt(row.engagement_score) || 0;
@@ -5758,10 +5795,12 @@ function renderJaxCard(row) {
         ${score} engagement
        </span>`
     : '';
+  const countLabel = cardNum && totalCards ? `<span style="font-size:10.5px;color:var(--muted);font-weight:600;">${cardNum} of ${totalCards}</span>` : '';
   return `<div class="jax-card${isHigh ? ' jax-card-hot' : ''}" id="${sid}">
     <div class="jax-card-meta">
+      ${countLabel}
       <span class="jax-handle">@${row.tweet_author || 'unknown'}</span>
-      <span class="jax-time">${row.created_at || ''}</span>
+      <span class="jax-time">${formatJaxDate(row.created_at)}</span>
       ${isHigh ? '<span class="jax-badge" style="background:rgba(255,40,31,0.12);color:var(--red);">High Engagement</span>' : '<span class="jax-badge pending" id="'+sid+'_badge">Pending</span>'}
       ${engagementHtml}
       ${row.tweet_url ? `<a href="${row.tweet_url}" target="_blank" class="jax-link">View on X ↗</a>` : ''}
