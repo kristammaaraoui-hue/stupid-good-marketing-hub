@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stupid Good AI — Marketing Hub</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
   /* ── Brand colors ── */
@@ -2161,6 +2162,65 @@ const DEFAULT_POSTS = [
 ];
 
 const DATA_VERSION = 2;
+// ── SUPABASE ──────────────────────────────────────────────────────────────────
+const SB_URL  = 'https://defnkztlfftllmlhccfr.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZm5renRsZmZ0bGxtbGhjY2ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDUzNTMsImV4cCI6MjA5NDA4MTM1M30.mmU3OfDFUejIMwANs2Z7iVkEk1cJQkrZbh58H4YLDng';
+const sbClient = supabase.createClient(SB_URL, SB_KEY);
+
+async function loadPostsFromSupabase() {
+  try {
+    const { data, error } = await sbClient.from('posts').select('*').order('created_at', { ascending: true });
+    if (error) { console.warn('Supabase load error:', error.message); return; }
+    if (!data || !data.length) return;
+    POSTS.length = 0;
+    data.forEach(r => {
+      POSTS.push({
+        id: isNaN(r.id) ? r.id : Number(r.id),
+        platform: r.platform,
+        content: r.content,
+        status: r.status,
+        date: r.date,
+        day: r.day || '',
+        time: r.time,
+        type: r.type,
+        pillar: r.pillar || '',
+        ...(r.design_url ? { designUrl: r.design_url } : {}),
+        ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
+        ...(r.manual ? { manual: true } : {})
+      });
+    });
+    savePosts(); // update localStorage cache
+    renderQueue();
+    if (typeof renderCalendar === 'function') renderCalendar();
+    updateStats();
+    if (typeof renderCommandCenter === 'function') renderCommandCenter();
+  } catch(e) { console.warn('Supabase sync error:', e); }
+}
+
+async function upsertPostToSupabase(post) {
+  try {
+    await sbClient.from('posts').upsert({
+      id: String(post.id),
+      platform: post.platform,
+      content: post.content,
+      status: post.status,
+      date: post.date || '',
+      day: post.day || '',
+      time: post.time || '',
+      type: post.type || 'Post',
+      pillar: post.pillar || '',
+      design_url: post.designUrl || null,
+      carousel_images: post.carouselImages || null,
+      manual: post.manual || false
+    }, { onConflict: 'id' });
+  } catch(e) { console.warn('Supabase upsert error:', e); }
+}
+
+async function deletePostFromSupabase(id) {
+  try { await sbClient.from('posts').delete().eq('id', String(id)); }
+  catch(e) { console.warn('Supabase delete error:', e); }
+}
+
 const POSTS = (function() {
   try {
     const saved = localStorage.getItem('sg_posts');
@@ -2171,8 +2231,11 @@ const POSTS = (function() {
   return JSON.parse(JSON.stringify(DEFAULT_POSTS));
 })();
 
-function savePosts() {
+function savePosts(changedIds) {
   try { localStorage.setItem('sg_posts', JSON.stringify(POSTS)); } catch(e) {}
+  // Sync changed posts to Supabase
+  const toSync = changedIds ? POSTS.filter(p => changedIds.includes(p.id)) : POSTS;
+  toSync.forEach(p => upsertPostToSupabase(p));
 }
 
 // ── DRAFT TWEETS (auto-distributed 12/day into POSTS) ───────────────────────
@@ -2532,13 +2595,22 @@ function deletePost(id) {
   if (idx === -1) return;
   const removed = POSTS.splice(idx, 1)[0];
   savePosts();
+  deletePostFromSupabase(id);
   renderQueue();
   if (typeof renderCalendar === 'function') renderCalendar();
   updateStats();
-  toastUndo('Post deleted', () => { POSTS.splice(idx, 0, removed); savePosts(); renderQueue(); if (typeof renderCalendar === 'function') renderCalendar(); updateStats(); });
+  toastUndo('Post deleted', () => {
+    POSTS.splice(idx, 0, removed);
+    savePosts([removed.id]);
+    renderQueue();
+    if (typeof renderCalendar === 'function') renderCalendar();
+    updateStats();
+  });
 }
 
 checkDailyAutoGenerate();
+// Load posts from Supabase on startup (overwrites localStorage with latest from DB)
+loadPostsFromSupabase();
 
 // Load saved API keys into settings inputs
 (function() {
