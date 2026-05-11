@@ -6600,7 +6600,7 @@ async function resolveMediaUrls(post) {
       for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
       const blob = new Blob([ab], { type: mimeType });
       const ext = mimeType.split('/')[1] || 'png';
-      const filename = 'post-' + post.id + '.' + ext;
+      const filename = 'post-' + post.id + '-' + Date.now() + '.' + ext;
       const uploadRes = await fetch(SB_URL + '/storage/v1/object/post-images/' + filename, {
         method: 'POST',
         headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': mimeType, 'x-upsert': 'true' },
