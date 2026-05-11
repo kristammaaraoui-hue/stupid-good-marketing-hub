@@ -2597,11 +2597,11 @@ async function autoScheduleToBlotato(post) {
     const res = await fetch('https://backend.blotato.com/api/v1/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'blotato-api-key': getBlotatoKey() },
-      body: JSON.stringify({ accountId, platform, text: post.content, mediaUrls: [], useNextFreeSlot: true })
+      body: JSON.stringify(buildBlotatoPayload(post, accountId, platform))
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
     post.status = 'scheduled';
-    savePosts();
+    savePosts([post.id]);
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
     updateStats();
@@ -6448,17 +6448,19 @@ function openPostModal(postId) {
 
   // Media
   const mediaEl = document.getElementById('pmMedia');
-  if (hasMedia) {
-    const accent = platAccent[post.platform] || '#888';
-    mediaEl.style.display = 'block';
-    mediaEl.innerHTML = post.image
-      ? `<img src="${post.image}" style="width:100%;border-radius:12px;display:block;">`
-      : `<div style="height:180px;background:var(--card2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${accent}" stroke-width="1.5" opacity="0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          <span style="font-size:11px;color:var(--muted2);">${post.platform === 'tiktok' ? 'Video' : 'Image'} · Not yet attached</span>
-        </div>`;
+  const imgSrc = post.designUrl || post.image || null;
+  const carouselImgs = post.carouselImages && post.carouselImages.length ? post.carouselImages : null;
+  mediaEl.style.display = 'block';
+  if (carouselImgs) {
+    mediaEl.innerHTML = `<div style="display:flex;gap:6px;overflow-x:auto;padding:4px 0;">${carouselImgs.map((src,i) => `<div style="flex-shrink:0;position:relative;"><img src="${src}" style="height:160px;width:auto;border-radius:10px;display:block;"><div style="position:absolute;top:4px;left:6px;font-size:10px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.8);">${i+1}</div></div>`).join('')}</div>`;
+  } else if (imgSrc) {
+    mediaEl.innerHTML = `<img src="${imgSrc}" style="width:100%;border-radius:12px;display:block;">`;
   } else {
-    mediaEl.style.display = 'none';
+    const accent = platAccent[post.platform] || '#888';
+    mediaEl.innerHTML = `<div style="height:160px;background:var(--card2);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${accent}" stroke-width="1.5" opacity="0.4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span style="font-size:11px;color:var(--muted2);">No image attached</span>
+    </div>`;
   }
 
   // QA
@@ -6474,7 +6476,7 @@ function openPostModal(postId) {
   actEl.innerHTML = `
     ${approveBtn}
     ${scheduleBtn}
-    <button onclick="openQueueEdit('${post.id}');closePostModal();" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">✎ Edit</button>
+    <button onclick="closePostModal();goQueue();setTimeout(()=>openQueueEdit('${post.id}'),120);" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">✎ Edit</button>
     <button onclick="deletePost('${post.id}');closePostModal();" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(255,40,31,0.25);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
     <button onclick="closePostModal()" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">Close</button>
   `;
@@ -6487,6 +6489,22 @@ function openPostModal(postId) {
 function closePostModal() {
   document.getElementById('postPreviewModal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function buildBlotatoPayload(post, accountId, platform) {
+  const base = { accountId, platform, text: post.content, mediaUrls: [], useNextFreeSlot: true };
+  if (platform === 'tiktok') {
+    Object.assign(base, {
+      privacyLevel: 'PUBLIC_TO_EVERYONE',
+      disabledComments: false,
+      disabledDuet: false,
+      disabledStitch: false,
+      isBrandedContent: false,
+      isYourBrand: false,
+      isAiGenerated: false
+    });
+  }
+  return base;
 }
 
 async function schedulePostToBlotato(postId, btn) {
@@ -6502,15 +6520,16 @@ async function schedulePostToBlotato(postId, btn) {
     const res = await fetch('https://backend.blotato.com/api/v1/posts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'blotato-api-key': key },
-      body: JSON.stringify({ accountId, platform, text: post.content, mediaUrls: [], useNextFreeSlot: true })
+      body: JSON.stringify(buildBlotatoPayload(post, accountId, platform))
     });
     if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
     post.status = 'scheduled';
-    savePosts();
+    savePosts([post.id]);
     if (btn) { btn.innerHTML = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.style.background = 'rgba(0,209,145,0.1)'; }
-    document.getElementById('pmStatusBadge').innerHTML = '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(139,92,246,0.13);color:var(--purple);text-transform:uppercase;letter-spacing:0.07em;">scheduled</span>';
+    const badge = document.getElementById('pmStatusBadge');
+    if (badge) badge.innerHTML = '<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(139,92,246,0.13);color:var(--purple);text-transform:uppercase;letter-spacing:0.07em;">scheduled</span>';
     if (typeof renderCalendar === 'function') renderCalendar();
-    toast(`Scheduled to Blotato`, 'var(--green)');
+    toast('Scheduled to Blotato', 'var(--green)');
   } catch(e) {
     if (btn) { btn.textContent = 'Schedule via Blotato'; btn.disabled = false; }
     toast(`Blotato error: ${e.message}`, 'var(--red)');
