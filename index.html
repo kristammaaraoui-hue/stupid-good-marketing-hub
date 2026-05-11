@@ -1684,6 +1684,17 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
     </div>
   </div>
 
+  <!-- STATUS FILTER TABS -->
+  <div style="display:flex;align-items:center;gap:6px;padding:8px 20px 0;flex-shrink:0;">
+    <button class="cal-status-tab on" id="cst-all" onclick="setCalStatusFilter('all',this)">All Posts</button>
+    <button class="cal-status-tab" id="cst-approved" onclick="setCalStatusFilter('approved',this)" style="--st-color:var(--green);">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;"></span> Approved
+    </button>
+    <button class="cal-status-tab" id="cst-pending" onclick="setCalStatusFilter('pending',this)" style="--st-color:var(--yellow);">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--yellow);display:inline-block;"></span> Pending
+    </button>
+  </div>
+
   <!-- PLATFORM FILTER TABS -->
   <div class="cal-plat-tabs">
     <button class="cal-plat-tab on" id="cpt-all" onclick="setCalPlatFilter('all',this)">
@@ -4288,12 +4299,17 @@ function openAddPostModal() {
   m.classList.add('active');
 }
 function closeAddPostModal() { document.getElementById('addPostModal').classList.remove('active'); }
-function apSetPlat(btn) { document.querySelectorAll('.ap-plat-btn').forEach(b => b.classList.remove('ap-plat-on')); btn.classList.add('ap-plat-on'); }
+function apSetPlat(btn) {
+  btn.classList.toggle('ap-plat-on');
+  // ensure at least one is always selected
+  const selected = document.querySelectorAll('.ap-plat-btn.ap-plat-on');
+  if (selected.length === 0) btn.classList.add('ap-plat-on');
+}
 function submitManualPost() {
   const caption = document.getElementById('apCaption').value.trim();
   if (!caption) { toast('Add a caption first', 'var(--red)'); return; }
-  const platBtn = document.querySelector('.ap-plat-btn.ap-plat-on');
-  const platform = platBtn ? platBtn.dataset.p : 'instagram';
+  const platforms = [...document.querySelectorAll('.ap-plat-btn.ap-plat-on')].map(b => b.dataset.p);
+  if (!platforms.length) { toast('Select at least one platform', 'var(--red)'); return; }
   const designUrl = document.getElementById('apDesignUrl').value.trim();
   const dateVal = document.getElementById('apDate').value;
   const timeVal = document.getElementById('apTime').value;
@@ -4304,15 +4320,16 @@ function submitManualPost() {
   const [h, m2] = (timeVal || '09:00').split(':');
   const hr = parseInt(h), mn = m2;
   const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mn + ' ' + (hr >= 12 ? 'PM' : 'AM');
-  const uid = Date.now();
-  const post = { id: uid, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: 'Post', manual: true };
-  if (designUrl) post.designUrl = designUrl;
-  POSTS.push(post);
+  platforms.forEach((platform, i) => {
+    const post = { id: Date.now() + i, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: 'Post', manual: true };
+    if (designUrl) post.designUrl = designUrl;
+    POSTS.push(post);
+  });
   savePosts();
   closeAddPostModal();
   renderQueue();
   updateStats();
-  toast('Post added to queue');
+  toast(platforms.length > 1 ? `Added to ${platforms.length} platforms` : 'Post added to queue');
 }
 
 // ── BATCH SELECT ──────────────────────────────────────────────────────────────
@@ -5918,10 +5935,18 @@ function calNav(dir) {
 }
 
 let calPlatFilter = 'all';
+let calStatusFilter = 'all';
 
 function setCalPlatFilter(plat, el) {
   calPlatFilter = plat;
   document.querySelectorAll('.cal-plat-tab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  renderCalendar();
+}
+
+function setCalStatusFilter(status, el) {
+  calStatusFilter = status;
+  document.querySelectorAll('.cal-status-tab').forEach(t => t.classList.remove('on'));
   el.classList.add('on');
   renderCalendar();
 }
@@ -5976,7 +6001,8 @@ function renderWeekView() {
     if (el) el.textContent = p === 'all' ? weekPostSet.length : weekPostSet.filter(x => x.platform === p).length;
   });
 
-  const filtered = calPlatFilter === 'all' ? POSTS : POSTS.filter(p => p.platform === calPlatFilter);
+  const byPlat = calPlatFilter === 'all' ? POSTS : POSTS.filter(p => p.platform === calPlatFilter);
+  const filtered = calStatusFilter === 'all' ? byPlat : byPlat.filter(p => p.status === calStatusFilter);
   const platAccent = { instagram:'#E1306C', x:'#6B7280', tiktok:'#ff2b55', blog:'#00d191' };
   const stColor = { approved:'var(--green)', pending:'var(--yellow)', draft:'var(--muted2)', scheduled:'var(--purple)' };
 
@@ -7559,7 +7585,7 @@ document.getElementById('blogPreviewModal').addEventListener('click', function(e
 
     <!-- Platform -->
     <div>
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Platform</div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Platform <span style="font-weight:400;text-transform:none;font-size:10px;">— select one or more</span></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;" id="apPlatformBtns">
         <button class="ap-plat-btn ap-plat-on" data-p="instagram" onclick="apSetPlat(this)">Instagram</button>
         <button class="ap-plat-btn" data-p="x" onclick="apSetPlat(this)">X / Twitter</button>
@@ -7613,6 +7639,9 @@ document.getElementById('blogPreviewModal').addEventListener('click', function(e
 <style>
 .ap-plat-btn { padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer; }
 .ap-plat-btn.ap-plat-on { background:rgba(0,209,145,0.12);color:var(--green);border-color:rgba(0,209,145,0.35); }
+.cal-status-tab { display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;white-space:nowrap; }
+.cal-status-tab:hover { background:var(--card2);color:var(--text); }
+.cal-status-tab.on { background:var(--card);color:var(--text);border-color:var(--border2);box-shadow:var(--card-shadow); }
 </style>
 
 <div id="blogPreviewModal" class="bpm-overlay">
