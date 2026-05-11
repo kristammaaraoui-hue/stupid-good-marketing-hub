@@ -6617,8 +6617,24 @@ async function resolveMediaUrls(post) {
   return [];
 }
 
+function buildScheduledDate(post) {
+  try {
+    const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const [mo, d] = post.date.split(' ');
+    const [tm, ap] = post.time.split(' ');
+    let [h, m] = tm.split(':').map(Number);
+    if (ap === 'PM' && h !== 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    const dt = new Date(new Date().getFullYear(), MONTHS[mo], parseInt(d), h, m, 0);
+    return dt.toISOString();
+  } catch(e) { return null; }
+}
+
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
-  const base = { accountId, platform, text: post.content, mediaUrls, useNextFreeSlot: true };
+  const scheduledDate = buildScheduledDate(post);
+  const base = scheduledDate
+    ? { accountId, platform, text: post.content, mediaUrls, scheduledDate }
+    : { accountId, platform, text: post.content, mediaUrls, useNextFreeSlot: true };
   if (platform === 'tiktok') {
     Object.assign(base, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
