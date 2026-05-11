@@ -6405,7 +6405,7 @@ function openPostModal(postId) {
   const platNames = { instagram:'Instagram', x:'X / Twitter', tiktok:'TikTok', blog:'Blog' };
   const platAccent = { instagram:'#E1306C', x:'#111', tiktok:'#ff2b55', blog:'var(--green)' };
   const statusColor = { approved:'var(--green)', pending:'var(--yellow)', draft:'var(--muted2)', scheduled:'var(--purple)' };
-  const hasMedia = post.platform === 'instagram' || post.platform === 'blog' || post.platform === 'tiktok';
+  const hasMedia = true;
 
   document.getElementById('pmPlatBadge').innerHTML = platBadge(post.platform, 28);
   document.getElementById('pmPlatName').textContent = platNames[post.platform] || post.platform;
@@ -6476,7 +6476,7 @@ function openPostModal(postId) {
   actEl.innerHTML = `
     ${approveBtn}
     ${scheduleBtn}
-    <button onclick="closePostModal();goQueue();setTimeout(()=>openQueueEdit('${post.id}'),120);" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">✎ Edit</button>
+    <button onclick="openModalEdit('${post.id}')" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;">✎ Edit</button>
     <button onclick="deletePost('${post.id}');closePostModal();" style="padding:9px 16px;border-radius:10px;border:1px solid rgba(255,40,31,0.25);background:transparent;color:var(--red);font-size:12px;font-weight:600;cursor:pointer;">Delete</button>
     <button onclick="closePostModal()" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">Close</button>
   `;
@@ -6489,6 +6489,34 @@ function openPostModal(postId) {
 function closePostModal() {
   document.getElementById('postPreviewModal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function openModalEdit(postId) {
+  const post = POSTS.find(p => p.id == postId);
+  if (!post) return;
+  const copyEl = document.getElementById('pmCopy');
+  const actEl  = document.getElementById('pmActions');
+  // Replace copy area with textarea
+  copyEl.innerHTML = `<textarea id="pmEditTa" style="width:100%;min-height:120px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;">${post.content}</textarea>`;
+  // Replace actions with Save/Cancel
+  actEl.innerHTML = `
+    <button onclick="saveModalEdit('${postId}')" style="padding:9px 20px;border-radius:10px;background:var(--green);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Save</button>
+    <button onclick="openPostModal('${postId}')" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">Cancel</button>
+  `;
+  document.getElementById('pmEditTa').focus();
+}
+
+function saveModalEdit(postId) {
+  const post = POSTS.find(p => p.id == postId);
+  if (!post) return;
+  const ta = document.getElementById('pmEditTa');
+  if (!ta) return;
+  post.content = ta.value.trim();
+  savePosts([post.id]);
+  renderQueue();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  openPostModal(postId); // re-render modal with saved content
+  toast('Post saved', 'var(--green)');
 }
 
 function buildBlotatoPayload(post, accountId, platform) {
