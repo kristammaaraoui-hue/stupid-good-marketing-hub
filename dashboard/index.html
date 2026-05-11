@@ -1529,6 +1529,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
     <div class="qt-ttl">Content Queue <span style="color:var(--muted);font-weight:400;font-size:13px;">— Apr 28 – May 4, 2026</span></div>
     <div class="qt-right">
       <button class="btn-sm" onclick="show('calendarView');renderCalendar()">📅 Calendar View</button>
+      <button class="btn-sm btn-sm-g" onclick="openAddPostModal()" style="background:rgba(0,209,145,0.12);color:var(--green);border-color:rgba(0,209,145,0.3);">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Post
+      </button>
       <button class="btn-sm" onclick="approveAllQ()">Approve All Pending</button>
       <button class="btn-sm btn-sm-g" onclick="scheduleAllQ()">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -4250,6 +4254,7 @@ function qCard(p) {
       ${statusBadge(p.status)}
       ${approveBtn}
       ${isBlog ? `<button class="ocbtn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();previewBlog('${p.id}')">Read</button>` : ''}
+      ${p.designUrl ? `<a href="${p.designUrl}" target="_blank" class="ocbtn" style="font-size:10px;padding:3px 8px;text-decoration:none;" onclick="event.stopPropagation()">Design ↗</a>` : ''}
       <button class="ocbtn" style="font-size:10px;padding:3px 8px;" onclick="event.stopPropagation();openQueueEdit('${p.id}')">Edit</button>
     </div>
   </div>`;
@@ -4270,6 +4275,45 @@ function filterQueueSearch(query) {
 }
 
 function approveAllQ() { POSTS.forEach(p=>{ if(p.status==='pending') p.status='approved'; }); savePosts(); renderQueue(); toast('All pending posts approved'); }
+
+function openAddPostModal() {
+  const m = document.getElementById('addPostModal');
+  const today = new Date();
+  document.getElementById('apDate').value = today.toISOString().slice(0,10);
+  document.getElementById('apTime').value = '09:00';
+  document.getElementById('apCaption').value = '';
+  document.getElementById('apDesignUrl').value = '';
+  document.getElementById('apStatus').value = 'approved';
+  document.querySelectorAll('.ap-plat-btn').forEach(b => b.classList.toggle('ap-plat-on', b.dataset.p === 'instagram'));
+  m.classList.add('active');
+}
+function closeAddPostModal() { document.getElementById('addPostModal').classList.remove('active'); }
+function apSetPlat(btn) { document.querySelectorAll('.ap-plat-btn').forEach(b => b.classList.remove('ap-plat-on')); btn.classList.add('ap-plat-on'); }
+function submitManualPost() {
+  const caption = document.getElementById('apCaption').value.trim();
+  if (!caption) { toast('Add a caption first', 'var(--red)'); return; }
+  const platBtn = document.querySelector('.ap-plat-btn.ap-plat-on');
+  const platform = platBtn ? platBtn.dataset.p : 'instagram';
+  const designUrl = document.getElementById('apDesignUrl').value.trim();
+  const dateVal = document.getElementById('apDate').value;
+  const timeVal = document.getElementById('apTime').value;
+  const status = document.getElementById('apStatus').value;
+  const d = dateVal ? new Date(dateVal + 'T12:00:00') : new Date();
+  const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const dayStr = d.toLocaleDateString('en-US', { weekday: 'long' });
+  const [h, m2] = (timeVal || '09:00').split(':');
+  const hr = parseInt(h), mn = m2;
+  const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mn + ' ' + (hr >= 12 ? 'PM' : 'AM');
+  const uid = Date.now();
+  const post = { id: uid, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: 'Post', manual: true };
+  if (designUrl) post.designUrl = designUrl;
+  POSTS.push(post);
+  savePosts();
+  closeAddPostModal();
+  renderQueue();
+  updateStats();
+  toast('Post added to queue');
+}
 
 // ── BATCH SELECT ──────────────────────────────────────────────────────────────
 let qSelectMode = false;
@@ -7505,6 +7549,72 @@ document.getElementById('blogPreviewModal').addEventListener('click', function(e
 </script>
 
 <!-- ── BLOG PREVIEW MODAL ── -->
+<!-- ── ADD POST MODAL ── -->
+<div id="addPostModal" class="bpm-overlay" onclick="if(event.target===this)closeAddPostModal()">
+  <div style="background:var(--card);border-radius:18px;width:100%;max-width:520px;padding:28px 28px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:18px;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:16px;font-weight:800;">Add Your Own Post</div>
+      <button onclick="closeAddPostModal()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:0;">&times;</button>
+    </div>
+
+    <!-- Platform -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Platform</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;" id="apPlatformBtns">
+        <button class="ap-plat-btn ap-plat-on" data-p="instagram" onclick="apSetPlat(this)">Instagram</button>
+        <button class="ap-plat-btn" data-p="x" onclick="apSetPlat(this)">X / Twitter</button>
+        <button class="ap-plat-btn" data-p="tiktok" onclick="apSetPlat(this)">TikTok</button>
+        <button class="ap-plat-btn" data-p="blog" onclick="apSetPlat(this)">Blog</button>
+      </div>
+    </div>
+
+    <!-- Caption -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Caption / Copy</div>
+      <textarea id="apCaption" rows="5" placeholder="Paste your caption here…" style="width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;"></textarea>
+    </div>
+
+    <!-- Design link -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Design Link <span style="font-weight:400;text-transform:none;font-size:10px;">(Canva URL or image URL — optional)</span></div>
+      <input id="apDesignUrl" type="url" placeholder="https://www.canva.com/design/…" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+    </div>
+
+    <!-- Date + Time -->
+    <div style="display:flex;gap:12px;">
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Date</div>
+        <input id="apDate" type="date" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Time</div>
+        <input id="apTime" type="time" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Status</div>
+      <select id="apStatus" style="padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+        <option value="approved">Approved — ready to schedule</option>
+        <option value="pending">Pending — needs review</option>
+        <option value="draft">Draft</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;padding-top:4px;">
+      <button onclick="submitManualPost()" style="flex:1;padding:11px 0;border-radius:12px;background:var(--green);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Add to Queue</button>
+      <button onclick="closeAddPostModal()" style="padding:11px 18px;border-radius:12px;background:var(--card2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid var(--border2);cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.ap-plat-btn { padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer; }
+.ap-plat-btn.ap-plat-on { background:rgba(0,209,145,0.12);color:var(--green);border-color:rgba(0,209,145,0.35); }
+</style>
+
 <div id="blogPreviewModal" class="bpm-overlay">
   <div class="bpm-panel">
     <div class="bpm-nav">
