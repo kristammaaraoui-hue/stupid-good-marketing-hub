@@ -4262,7 +4262,9 @@ function qCard(p) {
   return `<div class="q-row" id="qc-${p.id}" onclick="qRowClick(event,'${p.id}')" style="border-left-color:${accent};">
     <div class="q-row-check" id="qchk-${p.id}" onclick="event.stopPropagation();toggleSelectPost('${p.id}')"></div>
     <div class="q-row-icon">${platBadge(p.platform, 20)}</div>
-    ${p.designUrl && p.designUrl.startsWith('data:') ? `<img src="${p.designUrl}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ''}
+    ${p.carouselImages && p.carouselImages.length > 1
+      ? `<div style="display:flex;gap:2px;flex-shrink:0;">${p.carouselImages.slice(0,3).map((src,ci) => `<img src="${src}" style="width:28px;height:36px;border-radius:${ci===0?'6px 0 0 6px':'0'};${ci===p.carouselImages.slice(0,3).length-1?'border-radius:0 6px 6px 0;':''}object-fit:cover;">`).join('')}${p.carouselImages.length > 3 ? `<div style="width:20px;height:36px;background:var(--card2);border-radius:0 6px 6px 0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--muted);">+${p.carouselImages.length-3}</div>` : ''}</div>`
+      : p.designUrl && p.designUrl.startsWith('data:') ? `<img src="${p.designUrl}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : ''}
     <div class="q-row-body">
       <div class="q-row-preview">${p.content.replace(/\n/g,' ')}</div>
       <div class="q-row-meta">
@@ -4300,7 +4302,8 @@ function filterQueueSearch(query) {
 
 function approveAllQ() { POSTS.forEach(p=>{ if(p.status==='pending') p.status='approved'; }); savePosts(); renderQueue(); toast('All pending posts approved'); }
 
-let apUploadedDataUrl = null;
+let apImages = []; // [{dataUrl, name}]
+let apDragIdx = null;
 
 function openAddPostModal() {
   const m = document.getElementById('addPostModal');
@@ -4311,37 +4314,63 @@ function openAddPostModal() {
   document.getElementById('apDesignUrl').value = '';
   document.getElementById('apStatus').value = 'approved';
   document.querySelectorAll('.ap-plat-btn').forEach(b => b.classList.toggle('ap-plat-on', b.dataset.p === 'instagram'));
-  apClearUpload();
+  apImages = [];
+  apRenderStrip();
+  document.getElementById('apFileInput').value = '';
+  document.getElementById('apUploadZone').style.borderColor = '';
   m.classList.add('active');
 }
 
-function apClearUpload() {
-  apUploadedDataUrl = null;
-  document.getElementById('apUploadPreview').style.display = 'none';
-  document.getElementById('apUploadPrompt').style.display = '';
-  document.getElementById('apFileInput').value = '';
-  document.getElementById('apUploadZone').style.borderColor = '';
-}
-
-function apHandleFile(file) {
-  if (!file || !file.type.startsWith('image/')) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    apUploadedDataUrl = e.target.result;
-    document.getElementById('apPreviewImg').src = apUploadedDataUrl;
-    document.getElementById('apPreviewName').textContent = file.name;
-    document.getElementById('apUploadPreview').style.display = 'block';
-    document.getElementById('apUploadPrompt').style.display = 'none';
-    document.getElementById('apUploadZone').style.borderColor = 'var(--green)';
-  };
-  reader.readAsDataURL(file);
+function apHandleFiles(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  let loaded = 0;
+  arr.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      apImages.push({ dataUrl: e.target.result, name: file.name });
+      loaded++;
+      if (loaded === arr.length) apRenderStrip();
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function apHandleDrop(e) {
   e.preventDefault();
   document.getElementById('apUploadZone').style.borderColor = '';
-  const file = e.dataTransfer.files[0];
-  if (file) apHandleFile(file);
+  if (e.dataTransfer.files.length) apHandleFiles(e.dataTransfer.files);
+}
+
+function apRenderStrip() {
+  const strip = document.getElementById('apCarouselStrip');
+  if (!apImages.length) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+  strip.style.display = 'flex';
+  strip.innerHTML = apImages.map((img, i) => `
+    <div draggable="true" ondragstart="apDragIdx=${i}" ondragover="event.preventDefault()" ondrop="apThumbDrop(event,${i})"
+      style="position:relative;flex-shrink:0;cursor:grab;">
+      <img src="${img.dataUrl}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;display:block;border:2px solid var(--border2);">
+      <div style="position:absolute;top:2px;left:4px;font-size:9px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.7);">${i+1}</div>
+      <button onclick="apRemoveImage(${i})" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;">&times;</button>
+    </div>`).join('');
+}
+
+function apThumbDrop(e, toIdx) {
+  e.preventDefault();
+  if (apDragIdx === null || apDragIdx === toIdx) return;
+  const moved = apImages.splice(apDragIdx, 1)[0];
+  apImages.splice(toIdx, 0, moved);
+  apDragIdx = null;
+  apRenderStrip();
+}
+
+function apRemoveImage(idx) {
+  apImages.splice(idx, 1);
+  apRenderStrip();
+}
+
+function apStripDrop(e) {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) apHandleFiles(e.dataTransfer.files);
 }
 function closeAddPostModal() { document.getElementById('addPostModal').classList.remove('active'); }
 function apSetPlat(btn) {
@@ -4355,7 +4384,7 @@ function submitManualPost() {
   if (!caption) { toast('Add a caption first', 'var(--red)'); return; }
   const platforms = [...document.querySelectorAll('.ap-plat-btn.ap-plat-on')].map(b => b.dataset.p);
   if (!platforms.length) { toast('Select at least one platform', 'var(--red)'); return; }
-  const designUrl = apUploadedDataUrl || document.getElementById('apDesignUrl').value.trim();
+  const designUrl = apImages.length ? apImages[0].dataUrl : document.getElementById('apDesignUrl').value.trim();
   const dateVal = document.getElementById('apDate').value;
   const timeVal = document.getElementById('apTime').value;
   const status = document.getElementById('apStatus').value;
@@ -4366,8 +4395,9 @@ function submitManualPost() {
   const hr = parseInt(h), mn = m2;
   const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mn + ' ' + (hr >= 12 ? 'PM' : 'AM');
   platforms.forEach((platform, i) => {
-    const post = { id: Date.now() + i, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: 'Post', manual: true };
+    const post = { id: Date.now() + i, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: apImages.length > 1 ? 'Carousel' : 'Post', manual: true };
     if (designUrl) post.designUrl = designUrl;
+    if (apImages.length > 1) post.carouselImages = apImages.map(img => img.dataUrl);
     POSTS.push(post);
   });
   savePosts();
@@ -7648,25 +7678,25 @@ document.getElementById('blogPreviewModal').addEventListener('click', function(e
 
     <!-- Design -->
     <div>
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Design <span style="font-weight:400;text-transform:none;font-size:10px;">— optional</span></div>
-      <!-- Upload area -->
-      <div id="apUploadZone" onclick="document.getElementById('apFileInput').click()" style="border:2px dashed var(--border2);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:border-color 0.15s;margin-bottom:8px;"
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">
+        Images <span style="font-weight:400;text-transform:none;font-size:10px;">— optional · drag to reorder</span>
+      </div>
+      <!-- Thumbnail strip -->
+      <div id="apCarouselStrip" style="display:none;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;min-height:0;" ondragover="event.preventDefault()" ondrop="apStripDrop(event)"></div>
+      <!-- Drop zone -->
+      <div id="apUploadZone" onclick="document.getElementById('apFileInput').click()" style="border:2px dashed var(--border2);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:border-color 0.15s;"
         ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
         ondragleave="this.style.borderColor=''"
         ondrop="apHandleDrop(event)">
-        <input type="file" id="apFileInput" accept="image/*" style="display:none" onchange="apHandleFile(this.files[0])">
-        <div id="apUploadPreview" style="display:none;margin-bottom:8px;">
-          <img id="apPreviewImg" style="max-height:120px;max-width:100%;border-radius:8px;object-fit:contain;">
-          <div id="apPreviewName" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
-        </div>
-        <div id="apUploadPrompt" style="color:var(--muted);font-size:12px;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:4px;display:block;margin-left:auto;margin-right:auto;opacity:0.5;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Click or drag an image to upload
+        <input type="file" id="apFileInput" accept="image/*" multiple style="display:none" onchange="apHandleFiles(this.files)">
+        <div style="color:var(--muted);font-size:12px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:3px;display:block;margin-left:auto;margin-right:auto;opacity:0.5;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Click or drag images here — add as many as you need
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;">
         <div style="flex:1;height:1px;background:var(--border);"></div>
-        <span style="font-size:10px;color:var(--muted);">or paste a URL</span>
+        <span style="font-size:10px;color:var(--muted);">or paste a Canva / image URL</span>
         <div style="flex:1;height:1px;background:var(--border);"></div>
       </div>
       <input id="apDesignUrl" type="url" placeholder="https://www.canva.com/design/…" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
