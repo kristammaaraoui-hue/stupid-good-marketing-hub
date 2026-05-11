@@ -6633,7 +6633,7 @@ function buildScheduledDate(post) {
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
   const scheduledDate = buildScheduledDate(post);
   const base = scheduledDate
-    ? { accountId, platform, text: post.content, mediaUrls, scheduledDate }
+    ? { accountId, platform, text: post.content, mediaUrls, scheduledAt: scheduledDate }
     : { accountId, platform, text: post.content, mediaUrls, useNextFreeSlot: true };
   if (platform === 'tiktok') {
     Object.assign(base, {
