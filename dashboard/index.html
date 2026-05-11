@@ -1852,7 +1852,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
               <div class="settings-card-title">Queue &amp; Calendar</div>
               <div class="settings-card-sub">Post statuses, edits, and drag changes are saved in your browser automatically</div>
             </div>
-            <button onclick="if(confirm('Reset queue and calendar to default sample posts? This cannot be undone.')){localStorage.removeItem('sg_posts');location.reload();}" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s;">Reset to Defaults</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <button id="syncToSupabaseBtn" onclick="syncAllToSupabase(this)" style="padding:8px 16px;border-radius:8px;border:1px solid rgba(0,209,145,0.35);background:rgba(0,209,145,0.08);color:var(--green);font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s;">Sync to Supabase</button>
+              <button onclick="if(confirm('Reset queue and calendar to default sample posts? This cannot be undone.')){localStorage.removeItem('sg_posts');location.reload();}" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer;transition:all 0.15s;">Reset to Defaults</button>
+            </div>
           </div>
         </div>
       </div>
@@ -2219,6 +2222,24 @@ async function upsertPostToSupabase(post) {
 async function deletePostFromSupabase(id) {
   try { await sbClient.from('posts').delete().eq('id', String(id)); }
   catch(e) { console.warn('Supabase delete error:', e); }
+}
+
+async function syncAllToSupabase(btn) {
+  if (!POSTS.length) { toast('No posts to sync', 'var(--muted)'); return; }
+  const orig = btn.textContent;
+  btn.textContent = 'Syncing…';
+  btn.disabled = true;
+  try {
+    await Promise.all(POSTS.map(p => upsertPostToSupabase(p)));
+    btn.textContent = '✓ Synced ' + POSTS.length + ' posts';
+    btn.style.color = 'var(--green)';
+    toast('All ' + POSTS.length + ' posts saved to Supabase', 'var(--green)');
+    setTimeout(() => { btn.textContent = orig; btn.disabled = false; btn.style.color = ''; }, 3000);
+  } catch(e) {
+    btn.textContent = orig;
+    btn.disabled = false;
+    toast('Sync failed: ' + e.message, 'var(--red)');
+  }
 }
 
 const POSTS = (function() {
