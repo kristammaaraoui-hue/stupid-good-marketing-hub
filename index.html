@@ -6496,9 +6496,37 @@ function openModalEdit(postId) {
   if (!post) return;
   const copyEl = document.getElementById('pmCopy');
   const actEl  = document.getElementById('pmActions');
-  // Replace copy area with textarea
-  copyEl.innerHTML = `<textarea id="pmEditTa" style="width:100%;min-height:120px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;">${post.content}</textarea>`;
-  // Replace actions with Save/Cancel
+  // Parse current date to ISO for input
+  const MON2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let isoDate = '';
+  try {
+    const [mo, d] = post.date.split(' ');
+    const m = MON2.indexOf(mo);
+    isoDate = new Date(2026, m, parseInt(d)).toISOString().split('T')[0];
+  } catch(e) {}
+  // Parse time to HH:MM
+  let isoTime = '09:00';
+  try {
+    const [tm, ap] = post.time.split(' ');
+    let [h, mi] = tm.split(':');
+    h = parseInt(h);
+    if (ap === 'PM' && h !== 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    isoTime = String(h).padStart(2,'0') + ':' + mi;
+  } catch(e) {}
+
+  copyEl.innerHTML = `
+    <textarea id="pmEditTa" style="width:100%;min-height:110px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${post.content}</textarea>
+    <div style="display:flex;gap:10px;">
+      <div style="flex:1;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;">Date</div>
+        <input type="date" id="pmEditDate" value="${isoDate}" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--card2);color:var(--text);font-size:12px;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;">Time</div>
+        <input type="time" id="pmEditTime" value="${isoTime}" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:8px;background:var(--card2);color:var(--text);font-size:12px;outline:none;box-sizing:border-box;">
+      </div>
+    </div>`;
   actEl.innerHTML = `
     <button onclick="saveModalEdit('${postId}')" style="padding:9px 20px;border-radius:10px;background:var(--green);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Save</button>
     <button onclick="openPostModal('${postId}')" style="padding:9px 16px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:12px;cursor:pointer;">Cancel</button>
@@ -6509,13 +6537,25 @@ function openModalEdit(postId) {
 function saveModalEdit(postId) {
   const post = POSTS.find(p => p.id == postId);
   if (!post) return;
-  const ta = document.getElementById('pmEditTa');
+  const ta   = document.getElementById('pmEditTa');
+  const dateEl = document.getElementById('pmEditDate');
+  const timeEl = document.getElementById('pmEditTime');
   if (!ta) return;
   post.content = ta.value.trim();
+  if (dateEl && dateEl.value) {
+    const d = new Date(dateEl.value + 'T12:00:00');
+    post.date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    post.day  = d.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  if (timeEl && timeEl.value) {
+    const [h, m] = timeEl.value.split(':');
+    const hr = parseInt(h);
+    post.time = (hr > 12 ? hr - 12 : hr || 12) + ':' + m + ' ' + (hr >= 12 ? 'PM' : 'AM');
+  }
   savePosts([post.id]);
   renderQueue();
   if (typeof renderCalendar === 'function') renderCalendar();
-  openPostModal(postId); // re-render modal with saved content
+  openPostModal(postId);
   toast('Post saved', 'var(--green)');
 }
 
