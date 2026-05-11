@@ -6254,7 +6254,11 @@ function renderPipelineView() {
 
   function pipeCard(p, stage) {
     const accent = platAccent[p.platform] || '#888';
-    const actionBtn = stage.next ? `<button class="pipe-card-btn" onclick="event.stopPropagation();movePipeCard(${p.id},'${stage.next}');" style="color:${stage.nextColor};background:${stage.nextBg};border-color:${stage.nextBorder};">${stage.nextLabel}</button>` : `<div style="margin-top:9px;font-size:9.5px;color:var(--purple);font-weight:700;">&#10003; Scheduled</div>`;
+    const actionBtn = stage.next
+      ? stage.next === 'scheduled'
+        ? `<button class="pipe-card-btn" id="ppb-${p.id}" onclick="event.stopPropagation();schedulePipeCard(${p.id},this);" style="color:${stage.nextColor};background:${stage.nextBg};border-color:${stage.nextBorder};">${stage.nextLabel}</button>`
+        : `<button class="pipe-card-btn" onclick="event.stopPropagation();movePipeCard(${p.id},'${stage.next}');" style="color:${stage.nextColor};background:${stage.nextBg};border-color:${stage.nextBorder};">${stage.nextLabel}</button>`
+      : `<div style="margin-top:9px;font-size:9.5px;color:var(--purple);font-weight:700;">&#10003; Scheduled</div>`;
     return `<div class="pipe-card" style="border-left-color:${accent};" draggable="true" ondragstart="dragPost(event,${p.id})" onclick="openCalPostModal(${p.id})">
       <div class="pipe-card-top">
         ${platBadge(p.platform, 18)}
@@ -6302,6 +6306,27 @@ function movePipeCard(id, newStatus) {
   savePosts();
   renderCalendar();
   toast(`Moved to ${newStatus.charAt(0).toUpperCase()+newStatus.slice(1)}`);
+}
+
+async function schedulePipeCard(id, btn) {
+  const key = getBlotatoKey();
+  if (!key) { toast('Add your Blotato API key in Settings first', 'var(--red)'); return; }
+  const post = POSTS.find(x => x.id === id);
+  if (!post) return;
+  const platform = post.platform === 'x' ? 'twitter' : post.platform;
+  const accountId = BLOTATO_ACCOUNTS[platform];
+  if (!accountId) { toast(`${post.platform} not connected in Blotato`, 'var(--yellow)'); return; }
+  if (btn) { btn.textContent = 'Scheduling…'; btn.disabled = true; }
+  try {
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform));
+    post.status = 'scheduled';
+    savePosts([post.id]);
+    renderCalendar();
+    toast('Scheduled to Blotato', 'var(--green)');
+  } catch(e) {
+    if (btn) { btn.textContent = 'Schedule to Blotato'; btn.disabled = false; }
+    toast(`Blotato error: ${e.message}`, 'var(--red)');
+  }
 }
 
 function approveAllPipe() {
