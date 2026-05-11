@@ -2586,7 +2586,11 @@ function approvePost(id) {
   toastUndo('Post approved', () => { p.status = prev; savePosts(); updateStats(); renderQueue(); renderCommandCenter(); });
   // Auto-send to Blotato if API key is set
   const key = getBlotatoKey();
-  if (key) autoScheduleToBlotato(p);
+  if (key) {
+    autoScheduleToBlotato(p);
+  } else {
+    toast('Add your Blotato API key in Settings to auto-schedule', 'var(--yellow)');
+  }
 }
 
 async function autoScheduleToBlotato(post) {
