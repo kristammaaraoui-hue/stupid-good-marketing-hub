@@ -4744,13 +4744,14 @@ async function scheduleToBlotato(uid) {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
     const scheduledTime = buildScheduledDate(card);
-    const postPayload = { accountId: String(accountId), platform, text: postText, mediaUrls: [] };
-    if (scheduledTime) { postPayload.scheduledTime = scheduledTime; } else { postPayload.useNextFreeSlot = true; }
-    if (platform === 'instagram') { postPayload.mediaType = 'reel'; }
+    const content = { text: postText, platform, mediaUrls: [] };
+    if (platform === 'instagram') { content.mediaType = 'reel'; }
     if (platform === 'tiktok') {
-      Object.assign(postPayload, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
+      Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
-    await blotatoFetch(postPayload);
+    const postObj = { target: { targetType: platform }, content, accountId: String(accountId) };
+    if (scheduledTime) { postObj.scheduledTime = scheduledTime; } else { postObj.useNextFreeSlot = true; }
+    await blotatoFetch({ post: postObj });
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
@@ -6637,22 +6638,10 @@ function buildScheduledDate(post) {
 
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
   const scheduledTime = buildScheduledDate(post);
-  const payload = {
-    accountId: String(accountId),
-    platform,
-    text: post.content,
-    mediaUrls
-  };
-  if (scheduledTime) {
-    payload.scheduledTime = scheduledTime;
-  } else {
-    payload.useNextFreeSlot = true;
-  }
-  if (platform === 'instagram') {
-    payload.mediaType = 'reel';
-  }
+  const content = { text: post.content, platform, mediaUrls };
+  if (platform === 'instagram') { content.mediaType = 'reel'; }
   if (platform === 'tiktok') {
-    Object.assign(payload, {
+    Object.assign(content, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
       disabledComments: false,
       disabledDuet: false,
@@ -6662,7 +6651,17 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
       isAiGenerated: false
     });
   }
-  return payload;
+  const postObj = {
+    target: { targetType: platform },
+    content,
+    accountId: String(accountId)
+  };
+  if (scheduledTime) {
+    postObj.scheduledTime = scheduledTime;
+  } else {
+    postObj.useNextFreeSlot = true;
+  }
+  return { post: postObj };
 }
 
 async function schedulePostToBlotato(postId, btn) {
