@@ -6631,12 +6631,10 @@ function buildScheduledDate(post) {
 }
 
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
-  const scheduledDate = buildScheduledDate(post);
-  const base = scheduledDate
-    ? { accountId, platform, text: post.content, mediaUrls, scheduledAt: scheduledDate }
-    : { accountId, platform, text: post.content, mediaUrls, useNextFreeSlot: true };
+  const scheduledAt = buildScheduledDate(post);
+  const content = { text: post.content, platform, mediaUrls };
   if (platform === 'tiktok') {
-    Object.assign(base, {
+    Object.assign(content, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
       disabledComments: false,
       disabledDuet: false,
@@ -6646,7 +6644,17 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
       isAiGenerated: false
     });
   }
-  return base;
+  const postObj = {
+    target: { targetType: platform },
+    content,
+    accountId: String(accountId)
+  };
+  if (scheduledAt) {
+    postObj.scheduledAt = scheduledAt;
+  } else {
+    postObj.useNextFreeSlot = true;
+  }
+  return { post: postObj };
 }
 
 async function schedulePostToBlotato(postId, btn) {
