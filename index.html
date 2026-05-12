@@ -6641,8 +6641,9 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
   const scheduledTime = buildScheduledDate(post);
   const content = { text: post.content, platform, mediaUrls };
   if (platform === 'instagram') { content.mediaType = 'reel'; }
+  const target = { targetType: platform };
   if (platform === 'tiktok') {
-    Object.assign(content, {
+    Object.assign(target, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
       disabledComments: false,
       disabledDuet: false,
@@ -6653,7 +6654,7 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
     });
   }
   const postObj = {
-    target: { targetType: platform },
+    target,
     content,
     accountId: String(accountId)
   };
