@@ -4743,15 +4743,14 @@ async function scheduleToBlotato(uid) {
     if (platform === 'tiktok') {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
-    const content = { text: postText, platform, mediaUrls: [] };
-    if (platform === 'instagram') { content.mediaType = 'reel'; }
+    const scheduledTime = buildScheduledDate(card);
+    const postPayload = { accountId: String(accountId), platform, text: postText, mediaUrls: [] };
+    if (scheduledTime) { postPayload.scheduledTime = scheduledTime; } else { postPayload.useNextFreeSlot = true; }
+    if (platform === 'instagram') { postPayload.mediaType = 'reel'; }
     if (platform === 'tiktok') {
-      Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
+      Object.assign(postPayload, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
-    const scheduledAt = buildScheduledDate(card);
-    const postObj = { target: { targetType: platform }, content, accountId: String(accountId) };
-    if (scheduledAt) { postObj.scheduledTime = scheduledAt; } else { postObj.useNextFreeSlot = true; }
-    await blotatoFetch({ post: postObj });
+    await blotatoFetch(postPayload);
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
@@ -6637,13 +6636,23 @@ function buildScheduledDate(post) {
 }
 
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
-  const scheduledAt = buildScheduledDate(post);
-  const content = { text: post.content, platform, mediaUrls };
+  const scheduledTime = buildScheduledDate(post);
+  const payload = {
+    accountId: String(accountId),
+    platform,
+    text: post.content,
+    mediaUrls
+  };
+  if (scheduledTime) {
+    payload.scheduledTime = scheduledTime;
+  } else {
+    payload.useNextFreeSlot = true;
+  }
   if (platform === 'instagram') {
-    content.mediaType = 'reel';
+    payload.mediaType = 'reel';
   }
   if (platform === 'tiktok') {
-    Object.assign(content, {
+    Object.assign(payload, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
       disabledComments: false,
       disabledDuet: false,
@@ -6653,17 +6662,7 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
       isAiGenerated: false
     });
   }
-  const postObj = {
-    target: { targetType: platform },
-    content,
-    accountId: String(accountId)
-  };
-  if (scheduledAt) {
-    postObj.scheduledTime = scheduledAt;
-  } else {
-    postObj.useNextFreeSlot = true;
-  }
-  return { post: postObj };
+  return payload;
 }
 
 async function schedulePostToBlotato(postId, btn) {
