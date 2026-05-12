@@ -4714,6 +4714,7 @@ const BLOTATO_ACCOUNTS = { instagram: '44276', twitter: '17333', tiktok: '41980'
 const BLOTATO_PROXY = 'https://stupidgoodai.app.n8n.cloud/webhook/blotato-proxy';
 
 async function blotatoFetch(payload) {
+  console.log('[Blotato] Sending payload:', JSON.stringify(payload, null, 2));
   const res = await fetch(BLOTATO_PROXY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
