@@ -4742,11 +4742,13 @@ async function scheduleToBlotato(uid) {
     if (platform === 'tiktok') {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
-    const body = { accountId, platform, text: postText, mediaUrls: [], useNextFreeSlot: true };
+    const body = { accountId, platform, text: postText, mediaUrls: [], useNextFreeSlot: true,
+      scheduledAt: buildScheduledDate(card) || null
+     };
     if (platform === 'tiktok') {
       Object.assign(body, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
-    await blotatoFetch(body);
+    await blotatoFetch({ body });
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
