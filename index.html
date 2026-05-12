@@ -4744,6 +4744,7 @@ async function scheduleToBlotato(uid) {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
     const content = { text: postText, platform, mediaUrls: [] };
+    if (platform === 'instagram') { content.mediaType = 'reel'; }
     if (platform === 'tiktok') {
       Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
@@ -6638,6 +6639,9 @@ function buildScheduledDate(post) {
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
   const scheduledAt = buildScheduledDate(post);
   const content = { text: post.content, platform, mediaUrls };
+  if (platform === 'instagram') {
+    content.mediaType = 'reel';
+  }
   if (platform === 'tiktok') {
     Object.assign(content, {
       privacyLevel: 'PUBLIC_TO_EVERYONE',
