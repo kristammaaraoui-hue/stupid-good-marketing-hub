@@ -7939,7 +7939,7 @@ function closeBlogPreview() {
   document.getElementById('blogPreviewModal').classList.remove('active');
 }
 
-document.getElementById('blogPreviewModal').addEventListener('click', function(e) {
+document.getElementById('blogPreviewModal')?.addEventListener('click', function(e) {
   if (e.target === this) closeBlogPreview();
 });
 </script>
