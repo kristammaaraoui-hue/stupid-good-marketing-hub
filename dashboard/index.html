@@ -2214,7 +2214,8 @@ async function upsertPostToSupabase(post) {
       pillar: post.pillar || '',
       design_url: post.designUrl || null,
       carousel_images: post.carouselImages || null,
-      manual: post.manual || false
+      manual: post.manual || false,
+      scheduled_at: buildScheduledDate(post) || null
     }, { onConflict: 'id' });
   } catch(e) { console.warn('Supabase upsert error:', e); }
 }
@@ -4595,7 +4596,7 @@ function bulkDeleteSelected() {
 async function scheduleAllQ() {
   const key = getBlotatoKey();
   if (!key) { toast('Add your Blotato API key in Settings first', 'var(--red)'); return; }
-  const approved = POSTS.filter(p => p.status === 'approved');
+  const approved = POSTS.filter(p => p.status === 'approved' || p.status === 'scheduled');
   if (!approved.length) { toast('No approved posts to schedule', 'var(--yellow)'); return; }
   toast(`Scheduling ${approved.length} posts to Blotato…`, 'var(--purple)');
   let sent = 0, skipped = 0;
@@ -4742,11 +4743,14 @@ async function scheduleToBlotato(uid) {
     if (platform === 'tiktok') {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
-    const body = { accountId, platform, text: postText, mediaUrls: [], useNextFreeSlot: true };
+    const content = { text: postText, platform, mediaUrls: [] };
     if (platform === 'tiktok') {
-      Object.assign(body, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
+      Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
-    await blotatoFetch(body);
+    const scheduledAt = buildScheduledDate(card);
+    const postObj = { target: { targetType: platform }, content, accountId: String(accountId) };
+    if (scheduledAt) { postObj.scheduledAt = scheduledAt; } else { postObj.useNextFreeSlot = true; }
+    await blotatoFetch({ post: postObj });
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
