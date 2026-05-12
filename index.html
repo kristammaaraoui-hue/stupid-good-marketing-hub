@@ -2214,7 +2214,8 @@ async function upsertPostToSupabase(post) {
       pillar: post.pillar || '',
       design_url: post.designUrl || null,
       carousel_images: post.carouselImages || null,
-      manual: post.manual || false
+      manual: post.manual || false,
+      scheduled_at: buildScheduledDate(post) || null
     }, { onConflict: 'id' });
   } catch(e) { console.warn('Supabase upsert error:', e); }
 }
