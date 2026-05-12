@@ -4750,8 +4750,9 @@ async function scheduleToBlotato(uid) {
       Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
     const postObj = { target: { targetType: platform }, content, accountId: String(accountId) };
-    if (scheduledTime) { postObj.scheduledAt = scheduledTime; } else { postObj.useNextFreeSlot = true; }
-    await blotatoFetch({ post: postObj });
+    const postPayload = { post: postObj };
+    if (scheduledTime) { postPayload.scheduledTime = scheduledTime; } else { postPayload.useNextFreeSlot = true; }
+    await blotatoFetch(postPayload);
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
@@ -6656,12 +6657,13 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
     content,
     accountId: String(accountId)
   };
+  const payload = { post: postObj };
   if (scheduledTime) {
-    postObj.scheduledAt = scheduledTime;
+    payload.scheduledTime = scheduledTime;
   } else {
-    postObj.useNextFreeSlot = true;
+    payload.useNextFreeSlot = true;
   }
-  return { post: postObj };
+  return payload;
 }
 
 async function schedulePostToBlotato(postId, btn) {
