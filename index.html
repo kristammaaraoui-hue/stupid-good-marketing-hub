@@ -4596,7 +4596,7 @@ function bulkDeleteSelected() {
 async function scheduleAllQ() {
   const key = getBlotatoKey();
   if (!key) { toast('Add your Blotato API key in Settings first', 'var(--red)'); return; }
-  const approved = POSTS.filter(p => p.status === 'approved');
+  const approved = POSTS.filter(p => p.status === 'approved' || p.status === 'scheduled');
   if (!approved.length) { toast('No approved posts to schedule', 'var(--yellow)'); return; }
   toast(`Scheduling ${approved.length} posts to Blotato…`, 'var(--purple)');
   let sent = 0, skipped = 0;
