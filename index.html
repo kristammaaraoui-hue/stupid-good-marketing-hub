@@ -4750,7 +4750,7 @@ async function scheduleToBlotato(uid) {
       Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
     const postObj = { target: { targetType: platform }, content, accountId: String(accountId) };
-    if (scheduledTime) { postObj.scheduledTime = scheduledTime; } else { postObj.useNextFreeSlot = true; }
+    if (scheduledTime) { postObj.scheduledAt = scheduledTime; } else { postObj.useNextFreeSlot = true; }
     await blotatoFetch({ post: postObj });
     if (btn) { btn.textContent = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; }
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
@@ -6657,7 +6657,7 @@ function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
     accountId: String(accountId)
   };
   if (scheduledTime) {
-    postObj.scheduledTime = scheduledTime;
+    postObj.scheduledAt = scheduledTime;
   } else {
     postObj.useNextFreeSlot = true;
   }
