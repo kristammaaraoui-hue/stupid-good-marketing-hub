@@ -2709,6 +2709,7 @@ async function autoScheduleToBlotato(post) {
     const mediaUrls = await resolveMediaUrls(post);
     await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
+    markBlotatoSynced(post.id);
     savePosts([post.id]);
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
@@ -2739,7 +2740,25 @@ function deletePost(id) {
 
 checkDailyAutoGenerate();
 // Load posts from Supabase on startup (overwrites localStorage with latest from DB)
-loadPostsFromSupabase();
+loadPostsFromSupabase().then(() => {
+  // After Supabase sync, notify about scheduled posts not yet confirmed in Blotato
+  if (getBlotatoKey()) {
+    const unsynced = POSTS.filter(p => p.status === 'scheduled' && !isBlotatoSynced(p.id));
+    if (unsynced.length > 0) {
+      showBlotatoSyncBanner(unsynced.length);
+    }
+  }
+});
+
+function showBlotatoSyncBanner(count) {
+  const existing = document.getElementById('blotato-sync-banner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'blotato-sync-banner';
+  banner.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#e2e8f0;font-size:12px;font-weight:600;padding:10px 16px;border-radius:10px;border:1px solid rgba(242,84,253,0.4);z-index:9999;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+  banner.innerHTML = `<span style="color:var(--purple);">●</span> ${count} scheduled post${count>1?'s':''} not yet in Blotato <button onclick="scheduleAllQ().then(()=>{document.getElementById('blotato-sync-banner')?.remove();})" style="padding:4px 12px;border-radius:6px;background:rgba(242,84,253,0.15);border:1px solid rgba(242,84,253,0.4);color:var(--purple);font-size:11px;font-weight:700;cursor:pointer;">Sync Now</button><button onclick="this.closest('#blotato-sync-banner').remove()" style="padding:4px 8px;border-radius:6px;background:transparent;border:none;color:var(--muted);font-size:14px;cursor:pointer;">✕</button>`;
+  document.body.appendChild(banner);
+}
 
 // Load saved API keys into settings inputs
 (function() {
@@ -4707,29 +4726,29 @@ function bulkDeleteSelected() {
 async function scheduleAllQ() {
   const key = getBlotatoKey();
   if (!key) { toast('Add your Blotato API key in Settings first', 'var(--red)'); return; }
-  const approved = POSTS.filter(p => p.status === 'approved' || p.status === 'scheduled');
-  if (!approved.length) { toast('No approved posts to schedule', 'var(--yellow)'); return; }
-  toast(`Scheduling ${approved.length} posts to Blotato…`, 'var(--purple)');
+  // approved posts + scheduled posts not yet confirmed in Blotato (prevents duplicates)
+  const toSend = POSTS.filter(p => p.status === 'approved' || (p.status === 'scheduled' && !isBlotatoSynced(p.id)));
+  if (!toSend.length) { toast('All scheduled posts are already in Blotato', 'var(--green)'); return; }
+  toast(`Syncing ${toSend.length} posts to Blotato…`, 'var(--purple)');
   let sent = 0, skipped = 0;
-  for (const post of approved) {
+  for (const post of toSend) {
     const platform = post.platform === 'x' ? 'twitter' : post.platform;
     const accountId = BLOTATO_ACCOUNTS[platform];
     if (!accountId) { skipped++; continue; }
     try {
       const mediaUrls = await resolveMediaUrls(post);
       await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
-      const res = { ok: true }; // blotatoFetch throws on failure
-      if (!res.ok) { skipped++; continue; }
       post.status = 'scheduled';
+      markBlotatoSynced(post.id);
       sent++;
     } catch(e) { skipped++; }
   }
   savePosts();
   if (typeof renderQueue === 'function') renderQueue();
   if (typeof renderCalendar === 'function') renderCalendar();
-  if (sent > 0 && skipped === 0) toast(`${sent} posts scheduled via Blotato`, 'var(--green)');
-  else if (sent > 0) toast(`${sent} scheduled · ${skipped} skipped (platform not connected)`, 'var(--yellow)');
-  else toast('Blotato scheduling failed — check your API key and connections', 'var(--red)');
+  if (sent > 0 && skipped === 0) toast(`${sent} posts synced to Blotato`, 'var(--green)');
+  else if (sent > 0) toast(`${sent} synced · ${skipped} skipped (platform not connected)`, 'var(--yellow)');
+  else toast('Blotato sync failed — check your API key and connections', 'var(--red)');
 }
 
 function approveGeneratedPost(uid) {
@@ -4825,6 +4844,14 @@ const BLOTATO_ACCOUNTS = { instagram: '44276', twitter: '17333', tiktok: '41980'
 // n8n proxy URL — routes Blotato calls server-side to avoid CORS
 const BLOTATO_PROXY = 'https://stupidgoodai.app.n8n.cloud/webhook/blotato-proxy';
 
+// Track which post IDs have been successfully pushed to Blotato (persisted across sessions)
+const BLOTATO_SYNCED = new Set(JSON.parse(localStorage.getItem('sg_blotato_synced') || '[]'));
+function markBlotatoSynced(id) {
+  BLOTATO_SYNCED.add(String(id));
+  try { localStorage.setItem('sg_blotato_synced', JSON.stringify([...BLOTATO_SYNCED])); } catch(e) {}
+}
+function isBlotatoSynced(id) { return BLOTATO_SYNCED.has(String(id)); }
+
 async function blotatoFetch(payload) {
   console.log('[Blotato] Sending payload:', JSON.stringify(payload, null, 2));
   const res = await fetch(BLOTATO_PROXY, {
@@ -4868,7 +4895,7 @@ async function scheduleToBlotato(uid) {
     toast(`Scheduled to ${platLabel(card.platform)} via Blotato`, 'var(--green)');
     if (cardContents[uid]) cardContents[uid].status = 'scheduled';
     const qPost = POSTS.find(p => p.id == uid);
-    if (qPost) { qPost.status = 'scheduled'; savePosts(); }
+    if (qPost) { qPost.status = 'scheduled'; markBlotatoSynced(uid); savePosts(); }
   } catch(e) {
     if (btn) { btn.textContent = 'Schedule'; btn.disabled = false; }
     toast(`Blotato error: ${e.message}`, 'var(--red)');
@@ -6422,11 +6449,13 @@ function renderPipelineView() {
 function movePipeCard(id, newStatus) {
   const p = POSTS.find(x => x.id === id);
   if (!p) return;
-  const old = p.status;
   p.status = newStatus;
   savePosts();
   renderCalendar();
   toast(`Moved to ${newStatus.charAt(0).toUpperCase()+newStatus.slice(1)}`);
+  if (newStatus === 'scheduled' && getBlotatoKey()) {
+    autoScheduleToBlotato(p);
+  }
 }
 
 async function schedulePipeCard(id, btn) {
@@ -6442,6 +6471,7 @@ async function schedulePipeCard(id, btn) {
     const mediaUrls = await resolveMediaUrls(post);
     await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
+    markBlotatoSynced(post.id);
     savePosts([post.id]);
     renderCalendar();
     toast('Scheduled to Blotato', 'var(--green)');
@@ -6819,6 +6849,7 @@ async function schedulePostToBlotato(postId, btn) {
     const mediaUrls = await resolveMediaUrls(post);
     await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
     post.status = 'scheduled';
+    markBlotatoSynced(post.id);
     savePosts([post.id]);
     if (btn) { btn.innerHTML = '✓ Scheduled'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.style.background = 'rgba(0,209,145,0.1)'; }
     const badge = document.getElementById('pmStatusBadge');
