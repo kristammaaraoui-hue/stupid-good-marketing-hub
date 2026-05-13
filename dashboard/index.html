@@ -2247,7 +2247,23 @@ const POSTS = (function() {
   try {
     const saved = localStorage.getItem('sg_posts');
     const ver = parseInt(localStorage.getItem('sg_data_ver') || '1');
-    if (saved && ver >= DATA_VERSION) return JSON.parse(saved);
+    if (saved && ver >= DATA_VERSION) {
+      const parsed = JSON.parse(saved);
+      // Detect corrupted cache: deduplicate by content+date
+      const seen = new Set();
+      const deduped = parsed.filter(p => {
+        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      // If duplicates were found, drop cache so Supabase repopulates clean
+      if (deduped.length < parsed.length) {
+        localStorage.removeItem('sg_posts');
+        return JSON.parse(JSON.stringify(DEFAULT_POSTS));
+      }
+      return parsed;
+    }
   } catch(e) {}
   localStorage.setItem('sg_data_ver', DATA_VERSION);
   return JSON.parse(JSON.stringify(DEFAULT_POSTS));
@@ -2460,6 +2476,7 @@ const DRAFT_TWEETS = [
 ];
 
 (function distributeTweets() {
+  if (POSTS.some(p => p.id === 23)) return; // already seeded — skip to avoid duplicates on reload
   const days = [
     {day:'Monday',date:'Apr 28'},{day:'Tuesday',date:'Apr 29'},{day:'Wednesday',date:'Apr 30'},
     {day:'Thursday',date:'May 1'},{day:'Friday',date:'May 2'},{day:'Saturday',date:'May 3'},{day:'Sunday',date:'May 4'},
@@ -6070,7 +6087,7 @@ function renderJaxCard(row, cardNum, totalCards) {
     </div>
     <div class="jax-tweet">${row.tweet_text || ''}</div>
     <div class="jax-reply-label">JAX's Draft Reply</div>
-    <textarea class="jax-reply-edit" id="${sid}_txt" maxlength="280" oninput="document.getElementById('${sid}_chr').textContent=this.value.length+'/280'">${row.draft_reply || ''}</textarea>
+    <textarea class="jax-reply-edit" id="${sid}_txt" maxlength="280" oninput="document.getElementById('${sid}_chr').textContent=this.value.length+'/280'">${(row.draft_reply || '').replace(/—/g, '')}</textarea>
     <div class="jax-char-count" id="${sid}_chr">${charCount}/280</div>
     <div class="jax-actions">
       <button class="jax-btn-approve" id="${sid}_appbtn" onclick="approveJaxReply('${row.tweet_id}','${sid}')">
@@ -6550,8 +6567,18 @@ function openModalEdit(postId) {
     isoTime = String(h).padStart(2,'0') + ':' + mi;
   } catch(e) {}
 
+  const platColors = { instagram:'#E1306C', x:'#111', tiktok:'#ff2b55', blog:'var(--green)' };
+  const platLabelsEdit = { instagram:'Instagram', x:'X / Twitter', tiktok:'TikTok', blog:'Blog' };
+  const platBtns = ['instagram','x','tiktok','blog'].map(function(pl) {
+    var col = platColors[pl], bg = post.platform === pl ? col + '22' : 'transparent';
+    return '<button id="pmEditPlat-' + pl + '" onclick="pmTogglePlat(\'' + pl + '\')" style="padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ' + col + ';background:' + bg + ';color:' + col + ';transition:all 0.15s;" data-active="' + (post.platform===pl) + '">' + platLabelsEdit[pl] + '</button>';
+  }).join('');
   copyEl.innerHTML = `
     <textarea id="pmEditTa" style="width:100%;min-height:110px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${post.content}</textarea>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Platform</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${platBtns}</div>
+    </div>
     <div style="display:flex;gap:10px;">
       <div style="flex:1;">
         <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;">Date</div>
@@ -6569,6 +6596,17 @@ function openModalEdit(postId) {
   document.getElementById('pmEditTa').focus();
 }
 
+function pmTogglePlat(p) {
+  const platColors = { instagram:'#E1306C', x:'#111', tiktok:'#ff2b55', blog:'var(--green)' };
+  ['instagram','x','tiktok','blog'].forEach(pl => {
+    const btn = document.getElementById('pmEditPlat-' + pl);
+    if (!btn) return;
+    const active = pl === p;
+    btn.dataset.active = active;
+    btn.style.background = active ? platColors[pl] + '22' : 'transparent';
+  });
+}
+
 function saveModalEdit(postId) {
   const post = POSTS.find(p => p.id == postId);
   if (!post) return;
@@ -6577,6 +6615,12 @@ function saveModalEdit(postId) {
   const timeEl = document.getElementById('pmEditTime');
   if (!ta) return;
   post.content = ta.value.trim();
+  // Save platform if changed
+  const activeBtn = ['instagram','x','tiktok','blog'].find(pl => {
+    const btn = document.getElementById('pmEditPlat-' + pl);
+    return btn && btn.dataset.active === 'true';
+  });
+  if (activeBtn) post.platform = activeBtn;
   if (dateEl && dateEl.value) {
     const d = new Date(dateEl.value + 'T12:00:00');
     post.date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

@@ -4,7 +4,7 @@
     {
       "name": "stupid-good-dashboard",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "3737", "--directory", "/Users/kristamaaraoui/Desktop/Stupid Good Brand Guide"],
+      "runtimeArgs": ["-c", "import http.server, os; os.chdir('/Users/kristamaaraoui/Desktop/Stupid Good Brand Guide/dashboard'); http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=3737, bind='')"],
       "port": 3737
     }
   ]
