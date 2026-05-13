@@ -2188,10 +2188,10 @@ async function loadPostsFromSupabase() {
         break;
       }
       if (!data || !data.length) { done = true; break; }
-      if (from === 0) POSTS.length = 0;
       data.forEach(r => {
         const rowId = isNaN(r.id) ? r.id : Number(r.id);
-        POSTS.push({
+        const existing = POSTS.findIndex(p => String(p.id) === String(rowId));
+        const post = {
           id: rowId,
           platform: r.platform,
           content: r.content,
@@ -2204,7 +2204,8 @@ async function loadPostsFromSupabase() {
           ...(r.design_url ? { designUrl: r.design_url } : {}),
           ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
           ...(r.manual ? { manual: true } : {})
-        });
+        };
+        if (existing >= 0) { POSTS[existing] = post; } else { POSTS.push(post); }
       });
       totalLoaded += data.length;
       syncBadge.textContent = 'Syncing… ' + totalLoaded + ' posts';
@@ -2270,15 +2271,32 @@ async function syncAllToSupabase(btn) {
   }
 }
 
-// Always start from DEFAULT_POSTS — Supabase is the source of truth and will repopulate via loadPostsFromSupabase()
-localStorage.removeItem('sg_posts');
-const POSTS = JSON.parse(JSON.stringify(DEFAULT_POSTS));
+const POSTS = (function() {
+  try {
+    const saved = localStorage.getItem('sg_posts');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Deduplicate by platform+date+content to prevent cache bloat
+      const seen = new Set();
+      return parsed.filter(p => {
+        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_POSTS));
+})();
 
 function savePosts(changedIds) {
+  // Always write to localStorage immediately (synchronous, never blocks)
   try { localStorage.setItem('sg_posts', JSON.stringify(POSTS)); } catch(e) {}
-  // Sync changed posts to Supabase
-  const toSync = changedIds ? POSTS.filter(p => changedIds.includes(p.id)) : POSTS;
-  toSync.forEach(p => upsertPostToSupabase(p));
+  // Fire Supabase upserts in background — never await, never block the UI
+  if (changedIds && changedIds.length) {
+    const toSync = POSTS.filter(p => changedIds.includes(p.id));
+    toSync.forEach(p => upsertPostToSupabase(p).catch(() => {}));
+  }
 }
 
 // ── DRAFT TWEETS (auto-distributed 12/day into POSTS) ───────────────────────
@@ -2604,9 +2622,9 @@ function approvePost(id) {
   if (!p) return;
   const prev = p.status;
   p.status = 'approved';
-  savePosts();
+  savePosts([p.id]);
   updateStats();
-  toastUndo('Post approved', () => { p.status = prev; savePosts(); updateStats(); renderQueue(); renderCommandCenter(); });
+  toastUndo('Post approved', () => { p.status = prev; savePosts([p.id]); updateStats(); renderQueue(); renderCommandCenter(); });
   // Auto-send to Blotato if API key is set
   const key = getBlotatoKey();
   if (key) {
@@ -4321,6 +4339,7 @@ function approveAllRepurpose() {
     const btn = document.getElementById('apbtn-' + uid);
     if (btn) { btn.textContent = '✓ Approved'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.disabled = true; }
   });
+  if (count > 0) savePosts();
   updateStats();
   toast(`${count} posts added to queue`, 'var(--green)');
 }
@@ -4535,13 +4554,15 @@ function submitManualPost() {
   const [h, m2] = (timeVal || '09:00').split(':');
   const hr = parseInt(h), mn = m2;
   const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mn + ' ' + (hr >= 12 ? 'PM' : 'AM');
+  const newIds = [];
   platforms.forEach((platform, i) => {
     const post = { id: Date.now() + i, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: apImages.length > 1 ? 'Carousel' : 'Post', manual: true };
     if (designUrl) post.designUrl = designUrl;
     if (apImages.length > 1) post.carouselImages = apImages.map(img => img.dataUrl);
     POSTS.push(post);
+    newIds.push(post.id);
   });
-  savePosts();
+  savePosts(newIds);
   closeAddPostModal();
   renderQueue();
   updateStats();
@@ -4657,7 +4678,7 @@ function approveGeneratedPost(uid) {
   if (topBadge) { topBadge.textContent = 'Approved'; topBadge.className = 'sbadge s-approved'; }
   const btn = document.getElementById(`apbtn-${uid}`);
   if (btn) { btn.textContent = '✓ Approved'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.disabled = true; }
-  savePosts();
+  savePosts([uid]);
   updateStats();
   toast('Post approved — added to queue', 'var(--green)');
 }
