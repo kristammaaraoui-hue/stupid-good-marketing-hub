@@ -2172,11 +2172,18 @@ const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
   try {
-    const { data, error } = await sbClient.from('posts').select('*').order('created_at', { ascending: true });
-    if (error) { console.warn('Supabase load error:', error.message); return; }
-    if (!data || !data.length) return;
+    const PAGE = 500;
+    let allRows = [], from = 0, done = false;
+    while (!done) {
+      const { data, error } = await sbClient.from('posts').select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+      if (error) { console.warn('Supabase load error:', error.message); break; }
+      if (!data || !data.length) { done = true; break; }
+      allRows = allRows.concat(data);
+      if (data.length < PAGE) { done = true; } else { from += PAGE; }
+    }
+    if (!allRows.length) return;
     POSTS.length = 0;
-    data.forEach(r => {
+    allRows.forEach(r => {
       POSTS.push({
         id: isNaN(r.id) ? r.id : Number(r.id),
         platform: r.platform,
