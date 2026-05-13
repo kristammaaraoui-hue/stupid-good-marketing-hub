@@ -2171,18 +2171,27 @@ const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
+  const syncBadge = document.createElement('div');
+  syncBadge.id = 'sb-sync-badge';
+  syncBadge.style.cssText = 'position:fixed;bottom:18px;right:18px;background:#1a1a2e;color:#aaa;font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid #333;z-index:9999;';
+  syncBadge.textContent = 'Syncing…';
+  document.body.appendChild(syncBadge);
   try {
     const PAGE = 100;
     let from = 0, done = false, totalLoaded = 0;
     while (!done) {
       const { data, error } = await sbClient.from('posts').select('*').range(from, from + PAGE - 1);
-      if (error) { console.warn('Supabase load error:', error.message); break; }
+      if (error) {
+        syncBadge.style.color = '#f87171';
+        syncBadge.textContent = 'Sync error: ' + error.message;
+        setTimeout(() => syncBadge.remove(), 6000);
+        break;
+      }
       if (!data || !data.length) { done = true; break; }
-      // Merge into POSTS by ID — never wipe what's already loaded
+      if (from === 0) POSTS.length = 0;
       data.forEach(r => {
         const rowId = isNaN(r.id) ? r.id : Number(r.id);
-        const existing = POSTS.findIndex(p => String(p.id) === String(rowId));
-        const post = {
+        POSTS.push({
           id: rowId,
           platform: r.platform,
           content: r.content,
@@ -2195,19 +2204,27 @@ async function loadPostsFromSupabase() {
           ...(r.design_url ? { designUrl: r.design_url } : {}),
           ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
           ...(r.manual ? { manual: true } : {})
-        };
-        if (existing >= 0) { POSTS[existing] = post; } else { POSTS.push(post); }
+        });
       });
       totalLoaded += data.length;
+      syncBadge.textContent = 'Syncing… ' + totalLoaded + ' posts';
       if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
     }
-    if (!totalLoaded) return;
+    if (!totalLoaded) { syncBadge.remove(); return; }
     savePosts();
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
     updateStats();
     if (typeof renderCommandCenter === 'function') renderCommandCenter();
-  } catch(e) { console.warn('Supabase sync error:', e); }
+    const pending = POSTS.filter(p => p.status === 'pending').length;
+    syncBadge.style.color = '#00d191';
+    syncBadge.textContent = '✓ Synced ' + totalLoaded + ' posts (' + pending + ' pending)';
+    setTimeout(() => syncBadge.remove(), 4000);
+  } catch(e) {
+    syncBadge.style.color = '#f87171';
+    syncBadge.textContent = 'Sync failed: ' + e.message;
+    setTimeout(() => syncBadge.remove(), 6000);
+  }
 }
 
 async function upsertPostToSupabase(post) {
