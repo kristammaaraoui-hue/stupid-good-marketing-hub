@@ -2172,14 +2172,14 @@ const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
   try {
-    const PAGE = 500;
-    let allRows = [], from = 0, done = false;
+    const PAGE = 100;
+    let allRows = [], offset = 0, done = false;
     while (!done) {
-      const { data, error } = await sbClient.from('posts').select('*').order('created_at', { ascending: true }).range(from, from + PAGE - 1);
+      const { data, error } = await sbClient.from('posts').select('*').limit(PAGE).offset(offset);
       if (error) { console.warn('Supabase load error:', error.message); break; }
       if (!data || !data.length) { done = true; break; }
       allRows = allRows.concat(data);
-      if (data.length < PAGE) { done = true; } else { from += PAGE; }
+      if (data.length < PAGE) { done = true; } else { offset += PAGE; }
     }
     if (!allRows.length) return;
     POSTS.length = 0;
