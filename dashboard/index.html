@@ -2172,14 +2172,14 @@ const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
   try {
-    const PAGE = 100;
+    const PAGE = 50;
     let allRows = [], from = 0, done = false;
     while (!done) {
       const { data, error } = await sbClient.from('posts').select('*').range(from, from + PAGE - 1);
       if (error) { console.warn('Supabase load error:', error.message); break; }
       if (!data || !data.length) { done = true; break; }
       allRows = allRows.concat(data);
-      if (data.length < PAGE) { done = true; } else { from += PAGE; }
+      if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 200)); }
     }
     if (!allRows.length) return;
     POSTS.length = 0;
