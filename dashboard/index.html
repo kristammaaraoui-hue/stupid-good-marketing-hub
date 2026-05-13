@@ -2164,7 +2164,7 @@ const DEFAULT_POSTS = [
   {id:227,day:'Saturday',date:'May 3',platform:'blog',type:'Article',time:'8:00 AM',status:'draft',pillar:'Community',content:"How Our Insider Community Will Shape the Future of Eating Out"},
 ];
 
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 const SB_URL  = 'https://defnkztlfftllmlhccfr.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZm5renRsZmZ0bGxtbGhjY2ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDUzNTMsImV4cCI6MjA5NDA4MTM1M30.mmU3OfDFUejIMwANs2Z7iVkEk1cJQkrZbh58H4YLDng';
@@ -2172,34 +2172,37 @@ const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
   try {
-    const PAGE = 50;
-    let allRows = [], from = 0, done = false;
+    const PAGE = 100;
+    let from = 0, done = false, totalLoaded = 0;
     while (!done) {
       const { data, error } = await sbClient.from('posts').select('*').range(from, from + PAGE - 1);
       if (error) { console.warn('Supabase load error:', error.message); break; }
       if (!data || !data.length) { done = true; break; }
-      allRows = allRows.concat(data);
-      if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 200)); }
-    }
-    if (!allRows.length) return;
-    POSTS.length = 0;
-    allRows.forEach(r => {
-      POSTS.push({
-        id: isNaN(r.id) ? r.id : Number(r.id),
-        platform: r.platform,
-        content: r.content,
-        status: r.status,
-        date: r.date,
-        day: r.day || '',
-        time: r.time,
-        type: r.type,
-        pillar: r.pillar || '',
-        ...(r.design_url ? { designUrl: r.design_url } : {}),
-        ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
-        ...(r.manual ? { manual: true } : {})
+      // Merge into POSTS by ID — never wipe what's already loaded
+      data.forEach(r => {
+        const rowId = isNaN(r.id) ? r.id : Number(r.id);
+        const existing = POSTS.findIndex(p => String(p.id) === String(rowId));
+        const post = {
+          id: rowId,
+          platform: r.platform,
+          content: r.content,
+          status: r.status,
+          date: r.date,
+          day: r.day || '',
+          time: r.time,
+          type: r.type,
+          pillar: r.pillar || '',
+          ...(r.design_url ? { designUrl: r.design_url } : {}),
+          ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
+          ...(r.manual ? { manual: true } : {})
+        };
+        if (existing >= 0) { POSTS[existing] = post; } else { POSTS.push(post); }
       });
-    });
-    savePosts(); // update localStorage cache
+      totalLoaded += data.length;
+      if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
+    }
+    if (!totalLoaded) return;
+    savePosts();
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
     updateStats();
@@ -2250,31 +2253,9 @@ async function syncAllToSupabase(btn) {
   }
 }
 
-const POSTS = (function() {
-  try {
-    const saved = localStorage.getItem('sg_posts');
-    const ver = parseInt(localStorage.getItem('sg_data_ver') || '1');
-    if (saved && ver >= DATA_VERSION) {
-      const parsed = JSON.parse(saved);
-      // Detect corrupted cache: deduplicate by content+date
-      const seen = new Set();
-      const deduped = parsed.filter(p => {
-        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      // If duplicates were found, drop cache so Supabase repopulates clean
-      if (deduped.length < parsed.length) {
-        localStorage.removeItem('sg_posts');
-        return JSON.parse(JSON.stringify(DEFAULT_POSTS));
-      }
-      return parsed;
-    }
-  } catch(e) {}
-  localStorage.setItem('sg_data_ver', DATA_VERSION);
-  return JSON.parse(JSON.stringify(DEFAULT_POSTS));
-})();
+// Always start from DEFAULT_POSTS — Supabase is the source of truth and will repopulate via loadPostsFromSupabase()
+localStorage.removeItem('sg_posts');
+const POSTS = JSON.parse(JSON.stringify(DEFAULT_POSTS));
 
 function savePosts(changedIds) {
   try { localStorage.setItem('sg_posts', JSON.stringify(POSTS)); } catch(e) {}
