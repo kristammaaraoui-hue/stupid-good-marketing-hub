@@ -1678,6 +1678,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <button class="cal-vtb" id="cvt-pipeline" onclick="setCalViewMode('pipeline')">Pipeline</button>
       </div>
       <button class="btn-sm" onclick="goQueue()">List View</button>
+      <button class="btn-sm" onclick="openAddPostModal()" style="background:var(--green);color:#000;border-color:var(--green);font-weight:700;">
+        + Add Post
+      </button>
       <button class="btn-sm btn-sm-g" onclick="scheduleAllQ()">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         Sync to Blotato
@@ -2212,6 +2215,12 @@ async function loadPostsFromSupabase() {
       if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
     }
     if (!totalLoaded) { syncBadge.remove(); return; }
+    // Recover any local posts that didn't make it to Supabase (silent upsert failures, race conditions, etc.)
+    const sbIds = new Set(allRows.map(r => String(isNaN(r.id) ? r.id : Number(r.id))));
+    const orphans = POSTS.filter(p => !sbIds.has(String(p.id)));
+    if (orphans.length > 0) {
+      orphans.forEach(p => upsertPostToSupabase(p).catch(() => {}));
+    }
     savePosts();
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
@@ -2228,24 +2237,39 @@ async function loadPostsFromSupabase() {
   }
 }
 
-async function upsertPostToSupabase(post) {
+async function upsertPostToSupabase(post, retries) {
+  if (retries === undefined) retries = 3;
+  const payload = {
+    id: String(post.id),
+    platform: post.platform,
+    content: post.content,
+    status: post.status,
+    date: post.date || '',
+    day: post.day || '',
+    time: post.time || '',
+    type: post.type || 'Post',
+    pillar: post.pillar || '',
+    design_url: post.designUrl || null,
+    carousel_images: post.carouselImages || null,
+    manual: post.manual || false,
+    scheduled_at: buildScheduledDate(post) || null
+  };
+  for (var attempt = 0; attempt < retries; attempt++) {
+    try {
+      const { error } = await sbClient.from('posts').upsert(payload, { onConflict: 'id' });
+      if (!error) return true;
+      console.warn('Supabase upsert error (attempt ' + (attempt+1) + '):', error.message);
+    } catch(e) {
+      console.warn('Supabase upsert exception (attempt ' + (attempt+1) + '):', e.message);
+    }
+    if (attempt < retries - 1) await new Promise(function(r){ setTimeout(r, 600 * (attempt + 1)); });
+  }
+  // All retries failed — mark for recovery on next load
   try {
-    await sbClient.from('posts').upsert({
-      id: String(post.id),
-      platform: post.platform,
-      content: post.content,
-      status: post.status,
-      date: post.date || '',
-      day: post.day || '',
-      time: post.time || '',
-      type: post.type || 'Post',
-      pillar: post.pillar || '',
-      design_url: post.designUrl || null,
-      carousel_images: post.carouselImages || null,
-      manual: post.manual || false,
-      scheduled_at: buildScheduledDate(post) || null
-    }, { onConflict: 'id' });
-  } catch(e) { console.warn('Supabase upsert error:', e); }
+    var failed = JSON.parse(localStorage.getItem('sg_upsert_queue') || '[]');
+    if (!failed.includes(String(post.id))) { failed.push(String(post.id)); localStorage.setItem('sg_upsert_queue', JSON.stringify(failed)); }
+  } catch(e) {}
+  return false;
 }
 
 async function deletePostFromSupabase(id) {
@@ -2274,28 +2298,71 @@ async function syncAllToSupabase(btn) {
 const POSTS = (function() {
   try {
     const saved = localStorage.getItem('sg_posts');
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Deduplicate by platform+date+content to prevent cache bloat
+      const seen = new Set();
+      return parsed.filter(p => {
+        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
   } catch(e) {}
   return JSON.parse(JSON.stringify(DEFAULT_POSTS));
 })();
 
 function savePosts(changedIds) {
   // Strip base64 carousel images before writing to localStorage (they exceed the 5MB quota)
-  // Images are persisted in Supabase only
+  var slim = [];
   try {
-    const slim = POSTS.map(p => {
-      const out = { ...p };
-      // Strip base64 image data — only keep real URLs (stored in Supabase)
+    slim = POSTS.map(function(p) {
+      var out = Object.assign({}, p);
       if (out.carouselImages) delete out.carouselImages;
       if (out.designUrl && out.designUrl.startsWith('data:')) delete out.designUrl;
       return out;
     });
-    localStorage.setItem('sg_posts', JSON.stringify(slim));
+  } catch(e) { slim = POSTS.slice(); }
+
+  // Smart diff: find posts that changed vs what's currently in localStorage
+  // This means ANY savePosts() call — with or without changedIds — syncs only what changed
+  var toUpsert = [];
+  try {
+    if (changedIds && changedIds.length) {
+      // Explicit IDs provided — upsert those directly
+      toUpsert = POSTS.filter(function(p) { return changedIds.includes ? changedIds.includes(p.id) : changedIds.indexOf(p.id) >= 0; });
+    } else {
+      // No IDs provided — diff against previous localStorage snapshot to find changed posts
+      var prevRaw = localStorage.getItem('sg_posts');
+      if (prevRaw) {
+        var prev = JSON.parse(prevRaw);
+        var prevMap = {};
+        prev.forEach(function(p) { prevMap[String(p.id)] = p; });
+        toUpsert = POSTS.filter(function(p) {
+          var old = prevMap[String(p.id)];
+          if (!old) return true; // new post — upsert it
+          return old.status !== p.status || old.content !== p.content ||
+                 old.platform !== p.platform || old.date !== p.date ||
+                 old.time !== p.time || old.pillar !== p.pillar;
+        });
+      }
+    }
+    // Also drain the failed-upsert recovery queue
+    var failedQueue = JSON.parse(localStorage.getItem('sg_upsert_queue') || '[]');
+    if (failedQueue.length) {
+      localStorage.removeItem('sg_upsert_queue');
+      POSTS.filter(function(p) { return failedQueue.indexOf(String(p.id)) >= 0; }).forEach(function(p) {
+        if (!toUpsert.find(function(x){ return String(x.id) === String(p.id); })) toUpsert.push(p);
+      });
+    }
   } catch(e) {}
-  // Fire Supabase upserts in background — never await, never block the UI
-  if (changedIds && changedIds.length) {
-    const toSync = POSTS.filter(p => changedIds.includes(p.id));
-    toSync.forEach(p => upsertPostToSupabase(p).catch(() => {}));
+
+  try { localStorage.setItem('sg_posts', JSON.stringify(slim)); } catch(e) {}
+
+  // Fire upserts in background — never block the UI
+  if (toUpsert.length) {
+    toUpsert.forEach(function(p) { upsertPostToSupabase(p).catch(function(){}); });
   }
 }
 
@@ -2671,10 +2738,8 @@ function deletePost(id) {
 }
 
 checkDailyAutoGenerate();
-// Only load from Supabase if localStorage is empty — otherwise localStorage is the source of truth
-if (!localStorage.getItem('sg_posts')) {
-  loadPostsFromSupabase();
-}
+// Load posts from Supabase on startup (overwrites localStorage with latest from DB)
+loadPostsFromSupabase();
 
 // Load saved API keys into settings inputs
 (function() {
@@ -4567,6 +4632,7 @@ function submitManualPost() {
   savePosts(newIds);
   closeAddPostModal();
   renderQueue();
+  if (typeof renderCalendar === 'function') renderCalendar();
   updateStats();
   toast(platforms.length > 1 ? `Added to ${platforms.length} platforms` : 'Post added to queue');
 }
@@ -6173,11 +6239,12 @@ function rejectJaxCard(sid) {
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const PLAT_ORDER = ['instagram','x','tiktok','blog'];
-let calWeekOffset = 0;
+let calWeekOffset = (function(){ try { return parseInt(localStorage.getItem('sg_cal_week') || '0', 10) || 0; } catch(e){ return 0; } })();
 let dragPostId = null;
 
 function calNav(dir) {
   calWeekOffset += dir;
+  try { localStorage.setItem('sg_cal_week', calWeekOffset); } catch(e){}
   renderCalendar();
 }
 
