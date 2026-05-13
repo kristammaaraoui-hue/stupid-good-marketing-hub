@@ -2280,8 +2280,16 @@ const POSTS = (function() {
 })();
 
 function savePosts(changedIds) {
-  // Always write to localStorage immediately (synchronous, never blocks)
-  try { localStorage.setItem('sg_posts', JSON.stringify(POSTS)); } catch(e) {}
+  // Strip base64 carousel images before writing to localStorage (they exceed the 5MB quota)
+  // Images are persisted in Supabase only
+  try {
+    const slim = POSTS.map(p => {
+      if (!p.carouselImages) return p;
+      const { carouselImages, ...rest } = p;
+      return rest;
+    });
+    localStorage.setItem('sg_posts', JSON.stringify(slim));
+  } catch(e) {}
   // Fire Supabase upserts in background — never await, never block the UI
   if (changedIds && changedIds.length) {
     const toSync = POSTS.filter(p => changedIds.includes(p.id));
