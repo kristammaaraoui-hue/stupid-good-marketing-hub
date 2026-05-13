@@ -2212,6 +2212,12 @@ async function loadPostsFromSupabase() {
       if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
     }
     if (!totalLoaded) { syncBadge.remove(); return; }
+    // Recover any local posts that didn't make it to Supabase (silent upsert failures, race conditions, etc.)
+    const sbIds = new Set(allRows.map(r => String(isNaN(r.id) ? r.id : Number(r.id))));
+    const orphans = POSTS.filter(p => !sbIds.has(String(p.id)));
+    if (orphans.length > 0) {
+      orphans.forEach(p => upsertPostToSupabase(p).catch(() => {}));
+    }
     savePosts();
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
@@ -4575,6 +4581,7 @@ function submitManualPost() {
   savePosts(newIds);
   closeAddPostModal();
   renderQueue();
+  if (typeof renderCalendar === 'function') renderCalendar();
   updateStats();
   toast(platforms.length > 1 ? `Added to ${platforms.length} platforms` : 'Post added to queue');
 }
@@ -6181,11 +6188,12 @@ function rejectJaxCard(sid) {
 
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const PLAT_ORDER = ['instagram','x','tiktok','blog'];
-let calWeekOffset = 0;
+let calWeekOffset = (function(){ try { return parseInt(localStorage.getItem('sg_cal_week') || '0', 10) || 0; } catch(e){ return 0; } })();
 let dragPostId = null;
 
 function calNav(dir) {
   calWeekOffset += dir;
+  try { localStorage.setItem('sg_cal_week', calWeekOffset); } catch(e){}
   renderCalendar();
 }
 
