@@ -2164,40 +2164,68 @@ const DEFAULT_POSTS = [
   {id:227,day:'Saturday',date:'May 3',platform:'blog',type:'Article',time:'8:00 AM',status:'draft',pillar:'Community',content:"How Our Insider Community Will Shape the Future of Eating Out"},
 ];
 
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 // ── SUPABASE ──────────────────────────────────────────────────────────────────
 const SB_URL  = 'https://defnkztlfftllmlhccfr.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlZm5renRsZmZ0bGxtbGhjY2ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MDUzNTMsImV4cCI6MjA5NDA4MTM1M30.mmU3OfDFUejIMwANs2Z7iVkEk1cJQkrZbh58H4YLDng';
 const sbClient = supabase.createClient(SB_URL, SB_KEY);
 
 async function loadPostsFromSupabase() {
+  const syncBadge = document.createElement('div');
+  syncBadge.id = 'sb-sync-badge';
+  syncBadge.style.cssText = 'position:fixed;bottom:18px;right:18px;background:#1a1a2e;color:#aaa;font-size:11px;padding:6px 12px;border-radius:8px;border:1px solid #333;z-index:9999;';
+  syncBadge.textContent = 'Syncing…';
+  document.body.appendChild(syncBadge);
   try {
-    const { data, error } = await sbClient.from('posts').select('*').order('created_at', { ascending: true });
-    if (error) { console.warn('Supabase load error:', error.message); return; }
-    if (!data || !data.length) return;
-    POSTS.length = 0;
-    data.forEach(r => {
-      POSTS.push({
-        id: isNaN(r.id) ? r.id : Number(r.id),
-        platform: r.platform,
-        content: r.content,
-        status: r.status,
-        date: r.date,
-        day: r.day || '',
-        time: r.time,
-        type: r.type,
-        pillar: r.pillar || '',
-        ...(r.design_url ? { designUrl: r.design_url } : {}),
-        ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
-        ...(r.manual ? { manual: true } : {})
+    const PAGE = 100;
+    let from = 0, done = false, totalLoaded = 0;
+    while (!done) {
+      const { data, error } = await sbClient.from('posts').select('*').range(from, from + PAGE - 1);
+      if (error) {
+        syncBadge.style.color = '#f87171';
+        syncBadge.textContent = 'Sync error: ' + error.message;
+        setTimeout(() => syncBadge.remove(), 6000);
+        break;
+      }
+      if (!data || !data.length) { done = true; break; }
+      data.forEach(r => {
+        const rowId = isNaN(r.id) ? r.id : Number(r.id);
+        const existing = POSTS.findIndex(p => String(p.id) === String(rowId));
+        const post = {
+          id: rowId,
+          platform: r.platform,
+          content: r.content,
+          status: r.status,
+          date: r.date,
+          day: r.day || '',
+          time: r.time,
+          type: r.type,
+          pillar: r.pillar || '',
+          ...(r.design_url ? { designUrl: r.design_url } : {}),
+          ...(r.carousel_images ? { carouselImages: r.carousel_images } : {}),
+          ...(r.manual ? { manual: true } : {})
+        };
+        if (existing >= 0) { POSTS[existing] = post; } else { POSTS.push(post); }
       });
-    });
-    savePosts(); // update localStorage cache
+      totalLoaded += data.length;
+      syncBadge.textContent = 'Syncing… ' + totalLoaded + ' posts';
+      if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
+    }
+    if (!totalLoaded) { syncBadge.remove(); return; }
+    savePosts();
     renderQueue();
     if (typeof renderCalendar === 'function') renderCalendar();
     updateStats();
     if (typeof renderCommandCenter === 'function') renderCommandCenter();
-  } catch(e) { console.warn('Supabase sync error:', e); }
+    const pending = POSTS.filter(p => p.status === 'pending').length;
+    syncBadge.style.color = '#00d191';
+    syncBadge.textContent = '✓ Synced ' + totalLoaded + ' posts (' + pending + ' pending)';
+    setTimeout(() => syncBadge.remove(), 4000);
+  } catch(e) {
+    syncBadge.style.color = '#f87171';
+    syncBadge.textContent = 'Sync failed: ' + e.message;
+    setTimeout(() => syncBadge.remove(), 6000);
+  }
 }
 
 async function upsertPostToSupabase(post) {
@@ -2246,18 +2274,29 @@ async function syncAllToSupabase(btn) {
 const POSTS = (function() {
   try {
     const saved = localStorage.getItem('sg_posts');
-    const ver = parseInt(localStorage.getItem('sg_data_ver') || '1');
-    if (saved && ver >= DATA_VERSION) return JSON.parse(saved);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Deduplicate by platform+date+content to prevent cache bloat
+      const seen = new Set();
+      return parsed.filter(p => {
+        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
   } catch(e) {}
-  localStorage.setItem('sg_data_ver', DATA_VERSION);
   return JSON.parse(JSON.stringify(DEFAULT_POSTS));
 })();
 
 function savePosts(changedIds) {
+  // Always write to localStorage immediately (synchronous, never blocks)
   try { localStorage.setItem('sg_posts', JSON.stringify(POSTS)); } catch(e) {}
-  // Sync changed posts to Supabase
-  const toSync = changedIds ? POSTS.filter(p => changedIds.includes(p.id)) : POSTS;
-  toSync.forEach(p => upsertPostToSupabase(p));
+  // Fire Supabase upserts in background — never await, never block the UI
+  if (changedIds && changedIds.length) {
+    const toSync = POSTS.filter(p => changedIds.includes(p.id));
+    toSync.forEach(p => upsertPostToSupabase(p).catch(() => {}));
+  }
 }
 
 // ── DRAFT TWEETS (auto-distributed 12/day into POSTS) ───────────────────────
@@ -2460,6 +2499,7 @@ const DRAFT_TWEETS = [
 ];
 
 (function distributeTweets() {
+  if (POSTS.some(p => p.id === 23)) return; // already seeded — skip to avoid duplicates on reload
   const days = [
     {day:'Monday',date:'Apr 28'},{day:'Tuesday',date:'Apr 29'},{day:'Wednesday',date:'Apr 30'},
     {day:'Thursday',date:'May 1'},{day:'Friday',date:'May 2'},{day:'Saturday',date:'May 3'},{day:'Sunday',date:'May 4'},
@@ -2582,9 +2622,9 @@ function approvePost(id) {
   if (!p) return;
   const prev = p.status;
   p.status = 'approved';
-  savePosts();
+  savePosts([p.id]);
   updateStats();
-  toastUndo('Post approved', () => { p.status = prev; savePosts(); updateStats(); renderQueue(); renderCommandCenter(); });
+  toastUndo('Post approved', () => { p.status = prev; savePosts([p.id]); updateStats(); renderQueue(); renderCommandCenter(); });
   // Auto-send to Blotato if API key is set
   const key = getBlotatoKey();
   if (key) {
@@ -4299,6 +4339,7 @@ function approveAllRepurpose() {
     const btn = document.getElementById('apbtn-' + uid);
     if (btn) { btn.textContent = '✓ Approved'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.disabled = true; }
   });
+  if (count > 0) savePosts();
   updateStats();
   toast(`${count} posts added to queue`, 'var(--green)');
 }
@@ -4513,13 +4554,15 @@ function submitManualPost() {
   const [h, m2] = (timeVal || '09:00').split(':');
   const hr = parseInt(h), mn = m2;
   const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mn + ' ' + (hr >= 12 ? 'PM' : 'AM');
+  const newIds = [];
   platforms.forEach((platform, i) => {
     const post = { id: Date.now() + i, platform, content: caption, status, date: dateStr, day: dayStr, time: timeStr, type: apImages.length > 1 ? 'Carousel' : 'Post', manual: true };
     if (designUrl) post.designUrl = designUrl;
     if (apImages.length > 1) post.carouselImages = apImages.map(img => img.dataUrl);
     POSTS.push(post);
+    newIds.push(post.id);
   });
-  savePosts();
+  savePosts(newIds);
   closeAddPostModal();
   renderQueue();
   updateStats();
@@ -4635,7 +4678,7 @@ function approveGeneratedPost(uid) {
   if (topBadge) { topBadge.textContent = 'Approved'; topBadge.className = 'sbadge s-approved'; }
   const btn = document.getElementById(`apbtn-${uid}`);
   if (btn) { btn.textContent = '✓ Approved'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'rgba(0,209,145,0.4)'; btn.disabled = true; }
-  savePosts();
+  savePosts([uid]);
   updateStats();
   toast('Post approved — added to queue', 'var(--green)');
 }
@@ -6070,7 +6113,7 @@ function renderJaxCard(row, cardNum, totalCards) {
     </div>
     <div class="jax-tweet">${row.tweet_text || ''}</div>
     <div class="jax-reply-label">JAX's Draft Reply</div>
-    <textarea class="jax-reply-edit" id="${sid}_txt" maxlength="280" oninput="document.getElementById('${sid}_chr').textContent=this.value.length+'/280'">${row.draft_reply || ''}</textarea>
+    <textarea class="jax-reply-edit" id="${sid}_txt" maxlength="280" oninput="document.getElementById('${sid}_chr').textContent=this.value.length+'/280'">${(row.draft_reply || '').replace(/—/g, '')}</textarea>
     <div class="jax-char-count" id="${sid}_chr">${charCount}/280</div>
     <div class="jax-actions">
       <button class="jax-btn-approve" id="${sid}_appbtn" onclick="approveJaxReply('${row.tweet_id}','${sid}')">
@@ -6550,8 +6593,18 @@ function openModalEdit(postId) {
     isoTime = String(h).padStart(2,'0') + ':' + mi;
   } catch(e) {}
 
+  const platColors = { instagram:'#E1306C', x:'#111', tiktok:'#ff2b55', blog:'var(--green)' };
+  const platLabelsEdit = { instagram:'Instagram', x:'X / Twitter', tiktok:'TikTok', blog:'Blog' };
+  const platBtns = ['instagram','x','tiktok','blog'].map(function(pl) {
+    var col = platColors[pl], bg = post.platform === pl ? col + '22' : 'transparent';
+    return '<button id="pmEditPlat-' + pl + '" onclick="pmTogglePlat(\'' + pl + '\')" style="padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ' + col + ';background:' + bg + ';color:' + col + ';transition:all 0.15s;" data-active="' + (post.platform===pl) + '">' + platLabelsEdit[pl] + '</button>';
+  }).join('');
   copyEl.innerHTML = `
     <textarea id="pmEditTa" style="width:100%;min-height:110px;padding:10px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;line-height:1.6;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;margin-bottom:10px;">${post.content}</textarea>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Platform</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">${platBtns}</div>
+    </div>
     <div style="display:flex;gap:10px;">
       <div style="flex:1;">
         <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;">Date</div>
@@ -6569,6 +6622,17 @@ function openModalEdit(postId) {
   document.getElementById('pmEditTa').focus();
 }
 
+function pmTogglePlat(p) {
+  const platColors = { instagram:'#E1306C', x:'#111', tiktok:'#ff2b55', blog:'var(--green)' };
+  ['instagram','x','tiktok','blog'].forEach(pl => {
+    const btn = document.getElementById('pmEditPlat-' + pl);
+    if (!btn) return;
+    const active = pl === p;
+    btn.dataset.active = active;
+    btn.style.background = active ? platColors[pl] + '22' : 'transparent';
+  });
+}
+
 function saveModalEdit(postId) {
   const post = POSTS.find(p => p.id == postId);
   if (!post) return;
@@ -6577,6 +6641,12 @@ function saveModalEdit(postId) {
   const timeEl = document.getElementById('pmEditTime');
   if (!ta) return;
   post.content = ta.value.trim();
+  // Save platform if changed
+  const activeBtn = ['instagram','x','tiktok','blog'].find(pl => {
+    const btn = document.getElementById('pmEditPlat-' + pl);
+    return btn && btn.dataset.active === 'true';
+  });
+  if (activeBtn) post.platform = activeBtn;
   if (dateEl && dateEl.value) {
     const d = new Date(dateEl.value + 'T12:00:00');
     post.date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
