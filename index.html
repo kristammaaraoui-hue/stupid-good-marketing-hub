@@ -2274,17 +2274,7 @@ async function syncAllToSupabase(btn) {
 const POSTS = (function() {
   try {
     const saved = localStorage.getItem('sg_posts');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // Deduplicate by platform+date+content to prevent cache bloat
-      const seen = new Set();
-      return parsed.filter(p => {
-        const key = (p.platform||'') + '__' + (p.date||'') + '__' + (p.content||'').substring(0, 200);
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    }
+    if (saved) return JSON.parse(saved);
   } catch(e) {}
   return JSON.parse(JSON.stringify(DEFAULT_POSTS));
 })();
@@ -2671,8 +2661,10 @@ function deletePost(id) {
 }
 
 checkDailyAutoGenerate();
-// Load posts from Supabase on startup (overwrites localStorage with latest from DB)
-loadPostsFromSupabase();
+// Only load from Supabase if localStorage is empty — otherwise localStorage is the source of truth
+if (!localStorage.getItem('sg_posts')) {
+  loadPostsFromSupabase();
+}
 
 // Load saved API keys into settings inputs
 (function() {
