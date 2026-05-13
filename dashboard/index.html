@@ -2294,9 +2294,11 @@ function savePosts(changedIds) {
   // Images are persisted in Supabase only
   try {
     const slim = POSTS.map(p => {
-      if (!p.carouselImages) return p;
-      const { carouselImages, ...rest } = p;
-      return rest;
+      const out = { ...p };
+      // Strip base64 image data — only keep real URLs (stored in Supabase)
+      if (out.carouselImages) delete out.carouselImages;
+      if (out.designUrl && out.designUrl.startsWith('data:')) delete out.designUrl;
+      return out;
     });
     localStorage.setItem('sg_posts', JSON.stringify(slim));
   } catch(e) {}
