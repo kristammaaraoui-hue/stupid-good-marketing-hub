@@ -2115,12 +2115,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <a href="https://n8n.io" target="_blank" style="text-decoration:none;"><button class="settings-connect-btn" style="color:var(--purple);border-color:rgba(242,84,253,0.3);">Set Up n8n →</button></a>
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">n8n webhook URL</div><div class="settings-row-sub">Paste after deploying n8n (cloud or self-hosted)</div></div>
-            <input type="text" class="settings-input" placeholder="https://your-n8n.cloud/webhook/…">
+            <div><div class="settings-row-label">n8n webhook URL</div><div class="settings-row-sub">Base URL of your n8n cloud instance</div></div>
+            <input type="text" id="n8nUrlInput" class="settings-input" placeholder="https://your-n8n.cloud/webhook/…" oninput="localStorage.setItem('sg_n8n_url',this.value.trim());updateN8nStatus()">
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Workflow status</div><div class="settings-row-sub">Connect n8n to enable real scheduled actions</div></div>
-            <span style="font-size:11px;color:var(--muted2);font-style:italic;">Not connected — using demo mode</span>
+            <div><div class="settings-row-label">Workflow status</div><div class="settings-row-sub">Blotato proxy + Jax approval webhook</div></div>
+            <span id="n8nStatusLabel" style="font-size:11px;font-style:italic;">Checking…</span>
           </div>
         </div>
       </div>
@@ -2780,6 +2780,12 @@ function showBlotatoSyncBanner(count) {
   if (ginp && gkey) { ginp.value = gkey; }
   const gs = document.getElementById('gsheetsKeyStatus');
   if (gs && gkey) gs.innerHTML = '<span style="color:var(--green)">✓ Key saved</span>';
+
+  // Pre-populate n8n URL and show connection status
+  if (!localStorage.getItem('sg_n8n_url')) {
+    localStorage.setItem('sg_n8n_url', 'https://stupidgoodai.app.n8n.cloud');
+  }
+  if (typeof updateN8nStatus === 'function') updateN8nStatus();
 })();
 
 // ── PLATFORM ICON HELPER ─────────────────────────────────────────────────────
@@ -4840,6 +4846,24 @@ function getApiKey() {
 }
 function getBlotatoKey() {
   return localStorage.getItem('sg_blotato_key') || '';
+}
+
+const DEFAULT_N8N_URL = 'https://stupidgoodai.app.n8n.cloud';
+function updateN8nStatus() {
+  const inp = document.getElementById('n8nUrlInput');
+  const lbl = document.getElementById('n8nStatusLabel');
+  if (!inp || !lbl) return;
+  const val = (localStorage.getItem('sg_n8n_url') || DEFAULT_N8N_URL).trim();
+  if (!inp.value) inp.value = val;
+  if (val) {
+    lbl.style.color = 'var(--green)';
+    lbl.style.fontStyle = 'normal';
+    lbl.textContent = '✓ Connected — ' + val.replace('https://','').split('/')[0];
+  } else {
+    lbl.style.color = 'var(--muted2)';
+    lbl.style.fontStyle = 'italic';
+    lbl.textContent = 'Not connected — using demo mode';
+  }
 }
 
 // Blotato account IDs (Instagram: stupidgood.ai, Twitter: StupidGoodAI)
