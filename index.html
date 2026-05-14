@@ -6127,23 +6127,12 @@ function getJaxFollowerFilter() {
 }
 
 function applyJaxFollowerFilter() {
-  const { on, min, max } = getJaxFollowerFilter();
-  try { localStorage.setItem('jax_follower_filter', JSON.stringify({ on, min, max })); } catch(e) {}
   loadJaxQueue();
   renderEngageFeed();
 }
 
 function initJaxFollowerFilter() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('jax_follower_filter') || 'null');
-    if (!saved) return;
-    const cb = document.getElementById('jaxFollowerFilter');
-    const minEl = document.getElementById('jaxMinFollowers');
-    const maxEl = document.getElementById('jaxMaxFollowers');
-    if (cb) cb.checked = saved.on;
-    if (minEl) minEl.value = saved.min;
-    if (maxEl) maxEl.value = saved.max;
-  } catch(e) {}
+  try { localStorage.removeItem('jax_follower_filter'); } catch(e) {}
 }
 
 // ── JAX KEYWORDS ─────────────────────────────────────────────────────────────
