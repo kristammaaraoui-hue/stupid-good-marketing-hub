@@ -1611,19 +1611,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
       </div>
       <div class="rail-sec">
         <div class="rail-sec-title">Watching Keywords</div>
-        <div style="padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px;">
-          <span class="keyword-tag">food</span>
-          <span class="keyword-tag">restaurant</span>
-          <span class="keyword-tag">foodie</span>
-          <span class="keyword-tag">dining</span>
-          <span class="keyword-tag">Yelp</span>
-          <span class="keyword-tag">OpenTable</span>
-          <span class="keyword-tag">AI food</span>
-          <span class="keyword-tag">best restaurant</span>
-          <span class="keyword-tag">where to eat</span>
-        </div>
-        <div style="padding:4px 10px;">
-          <button class="rbtn" style="width:100%;justify-content:center;color:var(--red);border-color:rgba(255,40,31,0.3);" onclick="toast('Keyword editor coming soon','var(--red)')">+ Add keyword</button>
+        <div id="jaxKeywordList" style="padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px;"></div>
+        <div style="padding:4px 10px;display:flex;gap:4px;">
+          <input id="jaxKeywordInput" type="text" placeholder="Add keyword…" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;color:var(--text);outline:none;" onkeydown="if(event.key==='Enter')addJaxKeyword()">
+          <button class="rbtn" style="padding:5px 12px;color:var(--red);border-color:rgba(255,40,31,0.3);white-space:nowrap;" onclick="addJaxKeyword()">+ Add</button>
         </div>
       </div>
       <div class="rail-hist">
@@ -1650,6 +1641,15 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
               Refresh
             </button>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+          <label style="font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
+            <input type="checkbox" id="jaxFollowerFilter" checked onchange="applyJaxFollowerFilter()" style="cursor:pointer;accent-color:var(--red);"> Medium accounts only
+          </label>
+          <span style="font-size:11px;color:var(--muted);">followers:</span>
+          <input type="number" id="jaxMinFollowers" value="5000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <span style="font-size:11px;color:var(--muted);">–</span>
+          <input type="number" id="jaxMaxFollowers" value="500000" min="0" style="width:80px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
         </div>
         <div id="jaxReviewQueue">
           <div style="color:var(--muted);font-size:13px;padding:20px 0;">Loading…</div>
@@ -1885,7 +1885,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           </div>
           <div class="settings-row">
             <div><div class="settings-row-label">Scan keywords</div><div class="settings-row-sub">Comma-separated triggers for ENGAGE</div></div>
-            <input type="text" class="settings-input" value="food, restaurant, foodie, dining, Yelp, where to eat, AI food" placeholder="Keywords…">
+            <input type="text" class="settings-input" id="settingsKeywordInput" value="where should we eat tonight, restaurant recommendation tonight, help me find somewhere to eat, where should I eat, can't decide where to eat, need a dinner recommendation, yelp reviews are useless, yelp is useless, google reviews are useless, can't trust restaurant reviews, too many food apps, checked TikTok Instagram Reddit still can't decide, decision fatigue food, where to eat tonight, just found a hidden gem restaurant, no one is talking about this restaurant, underrated restaurant, date night restaurant, need a restaurant for a date, restaurant that says I planned this, planning a romantic dinner, tasting menus are a scam, hot take dining, restaurant hot take, overrated restaurant, where to eat in, best restaurants in, food, restaurant, foodie, dining, AI food" placeholder="Keywords…">
           </div>
         </div>
 
@@ -3344,7 +3344,7 @@ function connectDiscord() {
   }, 1400);
 }
 function goAgent(a) {
-  if (a === 'engage') { show('engageView'); loadJaxQueue(); return; }
+  if (a === 'engage') { show('engageView'); initJaxFollowerFilter(); renderJaxKeywords(); loadJaxQueue(); return; }
   if (a === 'calendar') { renderCalendar(); show('calendarView'); return; }
   if (a === 'scout') { goScout(); return; }
   show(a+'View');
@@ -5894,7 +5894,15 @@ function markFollowed(handle, btn) {
 }
 
 function renderEngageFeed() {
-  const items = engageFilter === 'all' ? ENGAGE_FEED : ENGAGE_FEED.filter(e => e.type === engageFilter);
+  const { on: ffOn, min: ffMin, max: ffMax } = getJaxFollowerFilter();
+  const items = ENGAGE_FEED.filter(e => {
+    if (engageFilter !== 'all' && e.type !== engageFilter) return false;
+    if (ffOn && e.followers) {
+      const fc = parseFollowerCount(e.followers);
+      if (fc < ffMin || fc > ffMax) return false;
+    }
+    return true;
+  });
   const feed = document.getElementById('engageFeed');
   if (!feed) return;
   if (!items.length) { feed.innerHTML = '<div class="empty"><div class="empty-h">No matches</div><div class="empty-p">Try scanning again or adjusting your keyword list.</div></div>'; return; }
@@ -6102,6 +6110,97 @@ async function runEngageScan() {
   });
 }
 
+// ── JAX FOLLOWER FILTER ───────────────────────────────────────────────────────
+function parseFollowerCount(str) {
+  if (!str) return 0;
+  const s = String(str).replace(/,/g, '').trim();
+  if (/[Kk]$/.test(s)) return parseFloat(s) * 1000;
+  if (/[Mm]$/.test(s)) return parseFloat(s) * 1000000;
+  return parseFloat(s) || 0;
+}
+
+function getJaxFollowerFilter() {
+  const on = document.getElementById('jaxFollowerFilter')?.checked ?? true;
+  const min = parseInt(document.getElementById('jaxMinFollowers')?.value || '5000');
+  const max = parseInt(document.getElementById('jaxMaxFollowers')?.value || '500000');
+  return { on, min, max };
+}
+
+function applyJaxFollowerFilter() {
+  const { on, min, max } = getJaxFollowerFilter();
+  try { localStorage.setItem('jax_follower_filter', JSON.stringify({ on, min, max })); } catch(e) {}
+  loadJaxQueue();
+  renderEngageFeed();
+}
+
+function initJaxFollowerFilter() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('jax_follower_filter') || 'null');
+    if (!saved) return;
+    const cb = document.getElementById('jaxFollowerFilter');
+    const minEl = document.getElementById('jaxMinFollowers');
+    const maxEl = document.getElementById('jaxMaxFollowers');
+    if (cb) cb.checked = saved.on;
+    if (minEl) minEl.value = saved.min;
+    if (maxEl) maxEl.value = saved.max;
+  } catch(e) {}
+}
+
+// ── JAX KEYWORDS ─────────────────────────────────────────────────────────────
+const JAX_DEFAULT_KEYWORDS = [
+  'where should we eat tonight','restaurant recommendation tonight','help me find somewhere to eat',
+  'where should I eat','can\'t decide where to eat','need a dinner recommendation',
+  'yelp reviews are useless','yelp is useless','google reviews are useless',
+  'can\'t trust restaurant reviews','too many food apps',
+  'checked TikTok Instagram Reddit still can\'t decide','decision fatigue food',
+  'where to eat tonight','just found a hidden gem restaurant',
+  'no one is talking about this restaurant','underrated restaurant',
+  'date night restaurant','need a restaurant for a date',
+  'restaurant that says I planned this','planning a romantic dinner',
+  'tasting menus are a scam','hot take dining','restaurant hot take',
+  'overrated restaurant','where to eat in','best restaurants in',
+  'food','restaurant','foodie','dining','AI food'
+];
+
+function getJaxKeywords() {
+  try {
+    const stored = localStorage.getItem('jax_keywords');
+    return stored ? JSON.parse(stored) : [...JAX_DEFAULT_KEYWORDS];
+  } catch(e) { return [...JAX_DEFAULT_KEYWORDS]; }
+}
+
+function saveJaxKeywords(kws) {
+  try { localStorage.setItem('jax_keywords', JSON.stringify(kws)); } catch(e) {}
+}
+
+function renderJaxKeywords() {
+  const el = document.getElementById('jaxKeywordList');
+  if (!el) return;
+  const kws = getJaxKeywords();
+  el.innerHTML = kws.map((k, i) =>
+    `<span class="keyword-tag" style="cursor:default;">${k}<span onclick="removeJaxKeyword(${i})" style="margin-left:4px;cursor:pointer;color:var(--muted2);font-size:10px;" title="Remove">✕</span></span>`
+  ).join('');
+}
+
+function addJaxKeyword() {
+  const inp = document.getElementById('jaxKeywordInput');
+  if (!inp) return;
+  const val = inp.value.trim();
+  if (!val) return;
+  const kws = getJaxKeywords();
+  if (!kws.includes(val)) { kws.push(val); saveJaxKeywords(kws); renderJaxKeywords(); toast('Keyword added', 'var(--red)'); }
+  else { toast('Already watching that keyword', 'var(--muted)'); }
+  inp.value = '';
+}
+
+function removeJaxKeyword(idx) {
+  const kws = getJaxKeywords();
+  kws.splice(idx, 1);
+  saveJaxKeywords(kws);
+  renderJaxKeywords();
+  toast('Keyword removed', 'var(--muted)');
+}
+
 // ── JAX REVIEW QUEUE ──────────────────────────────────────────────────────────
 const JAX_SHEET_CSV = 'https://docs.google.com/spreadsheets/d/1CRU52Axz_J05gyYVBhQBVwhZcEChueRVc1QEgW9qGNg/export?format=csv&gid=0';
 const JAX_WEBHOOK   = 'https://stupidgoodai.app.n8n.cloud/webhook/approve-reply';
@@ -6136,8 +6235,18 @@ async function loadJaxQueue() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
     if (text.includes('<!DOCTYPE') || text.includes('<html')) throw new Error('not-published');
+    const rejected = JSON.parse(localStorage.getItem('jax_rejected') || '[]');
+    const { on: ffOn, min: ffMin, max: ffMax } = getJaxFollowerFilter();
     const rows = parseJaxCSV(text)
-      .filter(r => r.status === 'pending' || r.status === 'pending_review')
+      .filter(r => {
+        if (r.status !== 'pending' && r.status !== 'pending_review') return false;
+        if (rejected.includes(r.tweet_id)) return false;
+        if (ffOn && r.follower_count) {
+          const fc = parseFollowerCount(r.follower_count);
+          if (fc < ffMin || fc > ffMax) return false;
+        }
+        return true;
+      })
       .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
@@ -6197,7 +6306,7 @@ function renderJaxCard(row, cardNum, totalCards) {
        </span>`
     : '';
   const countLabel = cardNum && totalCards ? `<span style="font-size:10.5px;color:var(--muted);font-weight:600;">${cardNum} of ${totalCards}</span>` : '';
-  return `<div class="jax-card${isHigh ? ' jax-card-hot' : ''}" id="${sid}">
+  return `<div class="jax-card${isHigh ? ' jax-card-hot' : ''}" id="${sid}" data-tweet-id="${row.tweet_id}">
     <div class="jax-card-meta">
       ${countLabel}
       <span class="jax-handle">@${row.tweet_author || 'unknown'}</span>
@@ -6230,20 +6339,56 @@ async function approveJaxReply(tweetId, sid) {
   btn.textContent = 'Posting…';
   btn.disabled = true;
   try {
-    const res = await fetch(JAX_WEBHOOK, {
+    await fetch(JAX_WEBHOOK, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-jax-auth': JAX_AUTH },
       body: JSON.stringify({ tweet_id: tweetId, reply_text: replyText })
     });
+
+    // Add to content calendar
+    const now = new Date();
+    const calPost = {
+      id: Date.now(),
+      platform: 'x',
+      content: replyText,
+      status: 'scheduled',
+      date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+      time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      type: 'Reply'
+    };
+    POSTS.push(calPost);
+    savePosts([calPost.id]);
+    if (typeof renderCalendar === 'function') renderCalendar();
+
+    // Push to Blotato
+    const bkey = getBlotatoKey();
+    if (bkey) {
+      const accountId = BLOTATO_ACCOUNTS['twitter'];
+      if (accountId) {
+        try {
+          await blotatoFetch(buildBlotatoPayload(calPost, accountId, 'twitter'));
+          markBlotatoSynced(calPost.id);
+          savePosts([calPost.id]);
+        } catch(be) { toast('Posted to X. Blotato sync failed: ' + be.message, 'var(--yellow)'); }
+      }
+    }
+
+    // Remove card cleanly
     const card = document.getElementById(sid);
-    if (card) { card.style.opacity = '0.55'; card.style.pointerEvents = 'none'; }
-    if (badge) { badge.textContent = 'Posted'; badge.className = 'jax-badge posted'; }
-    btn.textContent = '✓ Posted';
-    toast('Reply posted to X', 'var(--red)');
+    if (card) {
+      card.style.transition = 'opacity 0.3s, transform 0.3s';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(-20px)';
+      setTimeout(() => card.remove(), 300);
+    }
+    toast('Reply posted to X + added to calendar', 'var(--red)');
     const status = document.getElementById('jaxQueueStatus');
     if (status) {
-      const remaining = document.querySelectorAll('.jax-card:not([style*="opacity"])').length - 1;
-      status.textContent = remaining > 0 ? remaining + ' pending ' + (remaining === 1 ? 'reply' : 'replies') : 'Queue is clear';
+      setTimeout(() => {
+        const remaining = document.querySelectorAll('.jax-card').length;
+        status.textContent = remaining > 0 ? remaining + ' pending ' + (remaining === 1 ? 'reply' : 'replies') : 'Queue is clear';
+      }, 350);
     }
   } catch(e) {
     btn.textContent = 'Approve & Post';
@@ -6255,10 +6400,15 @@ async function approveJaxReply(tweetId, sid) {
 function rejectJaxCard(sid) {
   const card = document.getElementById(sid);
   if (!card) return;
+  const tweetId = card.dataset.tweetId;
+  if (tweetId) {
+    const rejected = JSON.parse(localStorage.getItem('jax_rejected') || '[]');
+    if (!rejected.includes(tweetId)) { rejected.push(tweetId); localStorage.setItem('jax_rejected', JSON.stringify(rejected)); }
+  }
   card.style.transition = 'opacity 0.3s, transform 0.3s';
   card.style.opacity = '0';
   card.style.transform = 'translateX(20px)';
-  setTimeout(() => card.remove(), 300);
+  setTimeout(() => { card.remove(); const rem = document.querySelectorAll('.jax-card').length; const status = document.getElementById('jaxQueueStatus'); if (status) status.textContent = rem > 0 ? rem + ' pending ' + (rem === 1 ? 'reply' : 'replies') : 'Queue is clear'; }, 300);
   toast('Reply rejected', 'var(--muted)');
 }
 
