@@ -1647,7 +1647,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <input type="checkbox" id="jaxFollowerFilter" checked onchange="applyJaxFollowerFilter()" style="cursor:pointer;accent-color:var(--red);"> Medium accounts only
           </label>
           <span style="font-size:11px;color:var(--muted);">followers:</span>
-          <input type="number" id="jaxMinFollowers" value="5000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <input type="number" id="jaxMinFollowers" value="10000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
           <span style="font-size:11px;color:var(--muted);">–</span>
           <input type="number" id="jaxMaxFollowers" value="500000" min="0" style="width:80px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
         </div>
@@ -6121,7 +6121,7 @@ function parseFollowerCount(str) {
 
 function getJaxFollowerFilter() {
   const on = document.getElementById('jaxFollowerFilter')?.checked ?? true;
-  const min = parseInt(document.getElementById('jaxMinFollowers')?.value || '5000');
+  const min = parseInt(document.getElementById('jaxMinFollowers')?.value || '10000');
   const max = parseInt(document.getElementById('jaxMaxFollowers')?.value || '500000');
   return { on, min, max };
 }
@@ -6241,8 +6241,9 @@ async function loadJaxQueue() {
       .filter(r => {
         if (r.status !== 'pending' && r.status !== 'pending_review') return false;
         if (rejected.includes(r.tweet_id)) return false;
-        if (ffOn && r.follower_count) {
-          const fc = parseFollowerCount(r.follower_count);
+        const rawFollowers = r.follower_count || r.followers || r.follower_count_str || r.author_followers || '';
+        if (ffOn && rawFollowers) {
+          const fc = parseFollowerCount(rawFollowers);
           if (fc < ffMin || fc > ffMax) return false;
         }
         return true;
