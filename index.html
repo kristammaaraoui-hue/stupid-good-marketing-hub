@@ -6239,8 +6239,8 @@ async function loadJaxQueue() {
           const fc = parseFollowerCount(rawFollowers);
           return fc >= ffMin && fc <= ffMax;
         }
-        // No follower data: use engagement_score >= 10 as proxy for medium accounts
-        return (parseInt(r.engagement_score) || 0) >= 10;
+        // No follower data in sheet: show all, engagement_score sort handles priority
+        return true;
       })
       .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
     const warn = document.getElementById('jaxFollowerWarn');
