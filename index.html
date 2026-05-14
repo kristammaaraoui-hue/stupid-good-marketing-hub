@@ -1642,7 +1642,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             </button>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding:9px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:9px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
           <label style="font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
             <input type="checkbox" id="jaxFollowerFilter" checked onchange="applyJaxFollowerFilter()" style="cursor:pointer;accent-color:var(--red);"> Medium accounts only
           </label>
@@ -1650,6 +1650,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <input type="number" id="jaxMinFollowers" value="10000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
           <span style="font-size:11px;color:var(--muted);">–</span>
           <input type="number" id="jaxMaxFollowers" value="500000" min="0" style="width:80px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+        </div>
+        <div id="jaxFollowerWarn" style="display:none;margin-bottom:12px;padding:8px 12px;background:rgba(255,217,17,0.07);border:1px solid rgba(255,217,17,0.25);border-radius:8px;font-size:11px;color:var(--yellow);line-height:1.5;">
+          No follower data in sheet — filtering by engagement score instead. To filter by actual follower count, add a <strong>follower_count</strong> column to your Google Sheet in n8n (Twitter node → author.public_metrics.followers_count).
         </div>
         <div id="jaxReviewQueue">
           <div style="color:var(--muted);font-size:13px;padding:20px 0;">Loading…</div>
@@ -6226,23 +6229,27 @@ async function loadJaxQueue() {
     if (text.includes('<!DOCTYPE') || text.includes('<html')) throw new Error('not-published');
     const rejected = JSON.parse(localStorage.getItem('jax_rejected') || '[]');
     const { on: ffOn, min: ffMin, max: ffMax } = getJaxFollowerFilter();
-    const rows = parseJaxCSV(text)
+    const allPending = parseJaxCSV(text).filter(r => (r.status === 'pending' || r.status === 'pending_review') && !rejected.includes(r.tweet_id));
+    const hasFollowerData = allPending.some(r => r.follower_count || r.followers || r.follower_count_str || r.author_followers);
+    const rows = allPending
       .filter(r => {
-        if (r.status !== 'pending' && r.status !== 'pending_review') return false;
-        if (rejected.includes(r.tweet_id)) return false;
+        if (!ffOn) return true;
         const rawFollowers = r.follower_count || r.followers || r.follower_count_str || r.author_followers || '';
-        if (ffOn && rawFollowers) {
+        if (rawFollowers) {
           const fc = parseFollowerCount(rawFollowers);
-          if (fc < ffMin || fc > ffMax) return false;
+          return fc >= ffMin && fc <= ffMax;
         }
-        return true;
+        // No follower data: use engagement_score >= 10 as proxy for medium accounts
+        return (parseInt(r.engagement_score) || 0) >= 10;
       })
       .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
+    const warn = document.getElementById('jaxFollowerWarn');
+    if (warn) warn.style.display = (!hasFollowerData && ffOn) ? 'block' : 'none';
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
       el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies. JAX will surface new opportunities on the next n8n scan.</div></div>';
     } else {
-      if (status) status.textContent = rows.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies') + ' · sorted by engagement';
+      if (status) status.textContent = rows.length + ' of ' + allPending.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies') + ' · sorted by engagement';
       el.innerHTML = rows.map((r, i) => renderJaxCard(r, i + 1, rows.length)).join('');
     }
   } catch(e) {
