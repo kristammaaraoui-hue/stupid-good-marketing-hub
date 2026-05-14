@@ -4726,10 +4726,10 @@ function bulkDeleteSelected() {
 async function scheduleAllQ() {
   const key = getBlotatoKey();
   if (!key) { toast('Add your Blotato API key in Settings first', 'var(--red)'); return; }
-  // approved posts + scheduled posts not yet confirmed in Blotato (prevents duplicates)
-  const toSend = POSTS.filter(p => p.status === 'approved' || (p.status === 'scheduled' && !isBlotatoSynced(p.id)));
-  if (!toSend.length) { toast('All scheduled posts are already in Blotato', 'var(--green)'); return; }
-  toast(`Syncing ${toSend.length} posts to Blotato…`, 'var(--purple)');
+  // Only send approved posts — already-scheduled posts are tracked by isBlotatoSynced to prevent duplicates
+  const toSend = POSTS.filter(p => p.status === 'approved');
+  if (!toSend.length) { toast('No approved posts to schedule', 'var(--yellow)'); return; }
+  toast(`Scheduling ${toSend.length} posts to Blotato…`, 'var(--purple)');
   let sent = 0, skipped = 0;
   for (const post of toSend) {
     const platform = post.platform === 'x' ? 'twitter' : post.platform;
