@@ -1928,11 +1928,21 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div class="settings-card" style="margin-top:10px;">
           <div style="margin-bottom:12px;">
             <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">ElevenLabs API Key <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(242,84,253,0.1);color:var(--purple);border:1px solid rgba(242,84,253,0.2);">REELS</span></div>
-            <div class="settings-card-sub">AI voiceover for reels — optional · elevenlabs.io → Sign in → Profile → API Key · free tier available</div>
+            <div class="settings-card-sub">AI voiceover for reels · elevenlabs.io → Profile → API Keys · Free plan works with your own cloned voice</div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <input type="password" id="elevenLabsKeyInput" class="settings-input" style="flex:1;" placeholder="ElevenLabs API key…" oninput="localStorage.setItem('sg_elevenlabs_key',this.value.trim())">
+            <input type="password" id="elevenLabsKeyInput" class="settings-input" style="flex:1;" placeholder="sk_…" oninput="localStorage.setItem('sg_elevenlabs_key',this.value.trim());updateElevenLabsStatus()">
             <button onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.textContent=this.previousElementSibling.type==='password'?'Show':'Hide'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;">Show</button>
+          </div>
+          <div id="elevenLabsStatus" style="font-size:11px;margin-top:8px;color:var(--muted);"></div>
+          <!-- Voice ID -->
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:4px;">Voice ID</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Paste any ElevenLabs voice ID. <strong>Free plan:</strong> create a voice at elevenlabs.io → Voices → Add a new voice → copy the ID. <strong>Starter plan ($5/mo):</strong> use any library voice ID.</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input type="text" id="elevenLabsVoiceInput" class="settings-input" style="flex:1;" placeholder="e.g. 21m00Tcm4TlvDq8ikWAM" oninput="localStorage.setItem('sg_elevenlabs_voice',this.value.trim())">
+              <a href="https://elevenlabs.io/app/voice-lab" target="_blank" rel="noopener" style="text-decoration:none;"><button style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap;">Get ID →</button></a>
+            </div>
           </div>
         </div>
       </div>
@@ -2897,6 +2907,11 @@ function showBlotatoSyncBanner(count) {
   const elkey = localStorage.getItem('sg_elevenlabs_key') || '';
   const elinp = document.getElementById('elevenLabsKeyInput');
   if (elinp && elkey) { elinp.value = elkey; }
+  const elst = document.getElementById('elevenLabsStatus');
+  if (elst && elkey) { elst.innerHTML = '<span style="color:var(--green)">✓ Key saved</span>'; }
+  const elvid = localStorage.getItem('sg_elevenlabs_voice') || '';
+  const elvinp = document.getElementById('elevenLabsVoiceInput');
+  if (elvinp && elvid) { elvinp.value = elvid; }
 
   // Pre-populate n8n URL and show connection status
   if (!localStorage.getItem('sg_n8n_url')) {
@@ -7801,9 +7816,10 @@ function setPixelTab(tab, el) {
 
 // ── REEL ENGINE ───────────────────────────────────────────────────────────────
 
-function getCreatomateKey() { return localStorage.getItem('sg_creatomate_key') || ''; }
-function getPexelsKey()     { return localStorage.getItem('sg_pexels_key') || ''; }
-function getElevenLabsKey() { return localStorage.getItem('sg_elevenlabs_key') || ''; }
+function getCreatomateKey()    { return localStorage.getItem('sg_creatomate_key') || ''; }
+function getPexelsKey()        { return localStorage.getItem('sg_pexels_key') || ''; }
+function getElevenLabsKey()    { return localStorage.getItem('sg_elevenlabs_key') || ''; }
+function getElevenLabsVoice()  { return localStorage.getItem('sg_elevenlabs_voice') || ''; }
 
 let reelState = { style: 'pain', dur: '15', broll: 'pexels' };
 
@@ -7836,8 +7852,70 @@ function updateCreatomateStatus() {
   const k = getCreatomateKey();
   const el = document.getElementById('creatomateStatus');
   if (!el) return;
-  el.textContent = k ? '✓ Key saved' : '';
-  el.style.color = k ? 'var(--green)' : 'var(--muted)';
+  el.innerHTML = k ? '<span style="color:var(--green)">✓ Key saved</span>' : '';
+}
+
+function updateElevenLabsStatus() {
+  const k = getElevenLabsKey();
+  const el = document.getElementById('elevenLabsStatus');
+  if (!el) return;
+  el.innerHTML = k ? '<span style="color:var(--green)">✓ Key saved</span>' : '';
+}
+
+// Generate voiceover audio via ElevenLabs + upload to Supabase for a public URL
+async function generateVoiceover(scenes) {
+  const elKey   = getElevenLabsKey();
+  const voiceId = getElevenLabsVoice();
+  if (!elKey || !voiceId) return null;
+
+  // Build natural narration from scene texts
+  const narration = scenes.map(s => s.text + (s.subtext ? '. ' + s.subtext : '')).join('. ');
+
+  try {
+    // 1. Call ElevenLabs TTS
+    const ttsResp = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: { 'xi-api-key': elKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: narration,
+        model_id: 'eleven_flash_v2_5',
+        voice_settings: { stability: 0.45, similarity_boost: 0.78, style: 0.15, use_speaker_boost: true }
+      })
+    });
+
+    if (!ttsResp.ok) {
+      const err = await ttsResp.json().catch(() => ({}));
+      const msg = err?.detail?.message || `ElevenLabs error ${ttsResp.status}`;
+      // Don't throw — fall back to music-only
+      console.warn('[Voiceover skipped]', msg);
+      return null;
+    }
+
+    const audioBlob = await ttsResp.blob();
+
+    // 2. Upload to Supabase Storage for a public URL Creatomate can reach
+    const filename = 'vo-' + Date.now() + '.mp3';
+    const uploadResp = await fetch(`${SB_URL}/storage/v1/object/post-images/${filename}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'audio/mpeg',
+        'x-upsert': 'true'
+      },
+      body: audioBlob
+    });
+
+    if (!uploadResp.ok) {
+      console.warn('[Voiceover upload failed]', await uploadResp.text());
+      return null;
+    }
+
+    return `${SB_URL}/storage/v1/object/public/post-images/${filename}`;
+  } catch(e) {
+    console.warn('[Voiceover error]', e.message);
+    return null;
+  }
 }
 
 async function searchPexels(query) {
@@ -7887,10 +7965,22 @@ Return ONLY a JSON array with exactly ${numScenes} objects:
   return JSON.parse(match[0]);
 }
 
-function buildReelSource(scenes, videoUrls, style) {
+function buildReelSource(scenes, videoUrls, style, voiceoverUrl) {
   const useBroll = reelState.broll === 'pexels' && videoUrls.some(v => v);
   const bgColors = { pain:'#0a0a14', claim:'#0a0a0a', lifestyle:'#0d1a0d', comparison:'#0a0a0a' };
   const bgColor = bgColors[style] || '#0a0a0a';
+
+  const audioElements = voiceoverUrl
+    ? [
+        // Voiceover (primary audio)
+        { type: 'audio', source: voiceoverUrl, duration: null, audio_fade_out: 1, volume: '100%' },
+        // Subtle music bed under voiceover
+        { type: 'audio', source: 'https://creatomate-static.s3.amazonaws.com/demo/pixabay-best-summer-128473.mp3', duration: null, audio_fade_out: 2, volume: '12%' }
+      ]
+    : [
+        // Background music only
+        { type: 'audio', source: 'https://creatomate-static.s3.amazonaws.com/demo/pixabay-best-summer-128473.mp3', duration: null, audio_fade_out: 2, volume: '28%' }
+      ];
 
   const source = {
     output_format: 'mp4',
@@ -7899,16 +7989,7 @@ function buildReelSource(scenes, videoUrls, style) {
     frame_rate: 30,
     fill_color: bgColor,
     snapshot_time: scenes[0]?.duration ? scenes[0].duration * 0.4 : 1.5,
-    elements: [
-      // Background music (subtle, 30% volume)
-      {
-        type: 'audio',
-        source: 'https://creatomate-static.s3.amazonaws.com/demo/pixabay-best-summer-128473.mp3',
-        duration: null,
-        audio_fade_out: 2,
-        volume: '25%'
-      }
-    ]
+    elements: audioElements
   };
 
   scenes.forEach((scene, i) => {
@@ -8047,14 +8128,22 @@ async function generateReel() {
     const scenes = await generateReelScript(brief, reelState.style, reelState.dur);
     if (!scenes?.length) throw new Error('No scenes generated');
 
-    // 2. Fetch Pexels B-roll
-    out.innerHTML = loadingHTML('purple', 'Sourcing B-roll…', `Searching Pexels for ${scenes.length} scenes · portrait video clips`);
-    const videoUrls = reelState.broll === 'pexels'
-      ? await Promise.all(scenes.map(s => searchPexels(s.pexels_query)))
-      : scenes.map(() => null);
+    // 2. Fetch Pexels B-roll + generate voiceover in parallel
+    const hasPexels = reelState.broll === 'pexels' && getPexelsKey();
+    const hasVoice  = getElevenLabsKey() && getElevenLabsVoice();
+    const steps = [hasPexels ? 'B-roll' : null, hasVoice ? 'voiceover' : null].filter(Boolean);
+    out.innerHTML = loadingHTML('purple',
+      steps.length ? `Sourcing ${steps.join(' + ')}…` : 'Building reel…',
+      `${hasPexels ? 'Pexels search for each scene' : 'Text-only mode'} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'}`
+    );
+
+    const [videoUrls, voiceoverUrl] = await Promise.all([
+      hasPexels ? Promise.all(scenes.map(s => searchPexels(s.pexels_query))) : Promise.resolve(scenes.map(() => null)),
+      hasVoice  ? generateVoiceover(scenes) : Promise.resolve(null)
+    ]);
 
     // 3. Build Creatomate source
-    const source = buildReelSource(scenes, videoUrls, reelState.style);
+    const source = buildReelSource(scenes, videoUrls, reelState.style, voiceoverUrl);
 
     // 4. Submit render
     out.innerHTML = loadingHTML('purple', 'Rendering reel…', 'Creatomate is building your MP4 · Usually takes 30–60 seconds');
@@ -8072,14 +8161,14 @@ async function generateReel() {
     if (!renderId) throw new Error('No render ID returned');
 
     // 5. Poll for completion
-    await pollReelRender(renderId, ck, scenes, brief);
+    await pollReelRender(renderId, ck, scenes, brief, !!voiceoverUrl);
 
   } catch(e) {
     out.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px;">⚠ ${e.message}</div>`;
   }
 }
 
-async function pollReelRender(renderId, ck, scenes, brief) {
+async function pollReelRender(renderId, ck, scenes, brief, hadVoiceover) {
   const out = document.getElementById('reelOutput');
   const maxAttempts = 40;
   for (let i = 0; i < maxAttempts; i++) {
@@ -8090,6 +8179,7 @@ async function pollReelRender(renderId, ck, scenes, brief) {
       });
       const render = await resp.json();
       if (render.status === 'succeeded') {
+        render._voiceoverUsed = hadVoiceover;
         showReelResult(render, scenes, brief);
         return;
       }
@@ -8122,7 +8212,7 @@ function showReelResult(render, scenes, brief) {
     <div style="animation:fadeUp 0.3s ease;">
       <div class="out-header">
         <div class="out-title">Reel ready</div>
-        <div class="out-meta">${scenes.length} scenes · ${totalDur}s · 1080×1920 MP4</div>
+        <div class="out-meta">${scenes.length} scenes · ${totalDur}s · 1080×1920 · ${render._voiceoverUsed ? 'AI voiceover' : 'music only'}</div>
       </div>
 
       <!-- Video preview -->
