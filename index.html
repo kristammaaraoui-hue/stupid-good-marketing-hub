@@ -1275,7 +1275,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div class="rh-name">Penn</div>
         <div class="rh-lbl" style="color:var(--yellow);margin-top:2px;">CONTENT · Blog & Newsletter</div>
         <div class="rh-desc">Blog posts and newsletters — in your brand voice, ready to publish or repurpose.</div>
-        <div class="rh-status"><div class="sdot-pulse" style="background:var(--yellow);box-shadow:0 0 6px var(--yellow)"></div><span style="color:var(--muted);font-size:11px;">Ready</span></div>
       </div>
       <div class="rail-hist">
         <div class="rht">Recent Posts</div>
@@ -4322,19 +4321,44 @@ function applyDesignEdits(n) {
 
 // ── DRAFT GENERATE ────────────────────────────────────────────────────────────
 
-async function generateDraft() {
-  const brief = document.getElementById('draftBrief').value || 'Brand blog post';
-  addHist('draftHist', brief.slice(0,40)+'…');
-  const out = document.getElementById('draftOutput');
-  out.innerHTML = loadingHTML('yellow', 'Penn is writing…', 'Calling Claude AI · Structuring sections · Applying brand voice rules');
-  await renderDraftOutput(brief);
+function getPennHistory() {
+  try { return JSON.parse(localStorage.getItem('sg_penn_history') || '[]'); } catch(e) { return []; }
+}
+function savePennHistory(brief, type, timestamp) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const history = getPennHistory().filter(h => !h.ts || h.ts > cutoff);
+  history.unshift({ brief, type, timestamp, ts: Date.now() });
+  if (history.length > 30) history.length = 30;
+  localStorage.setItem('sg_penn_history', JSON.stringify(history));
+  renderPennHistory();
+}
+function renderPennHistory() {
+  const el = document.getElementById('draftHist');
+  if (!el) return;
+  const history = getPennHistory();
+  if (!history.length) { el.innerHTML = '<div class="rhe">No posts yet</div>'; return; }
+  el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t">${h.brief.slice(0,34)}${h.brief.length>34?'…':''}</div><div class="hi-d">${h.type} · ${h.timestamp}</div></div>`).join('');
 }
 
-async function renderDraftOutput(brief) {
+async function generateDraft() {
+  // Read selected topic chip + textarea — chip used as fallback if brief is empty
+  const selectedChip = document.querySelector('#draftTabMain .chips .chip.on-y')?.dataset?.v || '';
+  const typedBrief = document.getElementById('draftBrief').value.trim();
+  const brief = typedBrief || selectedChip || 'Brand blog post';
+  const length = railState.dl || '~800 words';
+  const format = railState.df || 'How-To Guide';
+  const timestamp = new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  savePennHistory(brief, format, timestamp);
+  const out = document.getElementById('draftOutput');
+  out.innerHTML = loadingHTML('yellow', 'Penn is writing…', 'Calling Claude AI · Structuring sections · Applying brand voice rules');
+  await renderDraftOutput(brief, length, format);
+}
+
+async function renderDraftOutput(brief, length='~800 words', format='How-To Guide') {
   try {
     const raw = await callClaude(
       PENN_SYSTEM,
-      `Write a blog post for Stupid Good AI about: ${brief}\n\nFormat your response as:\nTITLE: [title here]\nSECTIONS: [comma-separated section names]\nEXCERPT: [opening 2-3 sentences only]\nFULL: [full blog post]\n\nKeep it 600-900 words total.`
+      `Write a ${format} blog post for Stupid Good AI about: ${brief}\n\nFormat your response as:\nTITLE: [title here]\nSECTIONS: [comma-separated section names]\nEXCERPT: [opening 2-3 sentences only]\nFULL: [full blog post]\n\nTarget length: ${length}.`
     );
 
     // Parse response
@@ -7488,8 +7512,7 @@ function setPixelTab(tab, el) {
 function setDraftTab(tab, el) {
   document.getElementById('draftTabMain').style.display       = tab === 'write'      ? 'flex' : 'none';
   document.getElementById('draftTabNewsletter').style.display = tab === 'newsletter'  ? 'flex' : 'none';
-  document.getElementById('draftTabQA').style.display         = tab === 'qa'          ? 'flex' : 'none';
-  ['draft-tab-write','draft-tab-newsletter','draft-tab-qa'].forEach(id => document.getElementById(id)?.classList.remove('on-y'));
+  ['draft-tab-write','draft-tab-newsletter'].forEach(id => document.getElementById(id)?.classList.remove('on-y'));
   el.classList.add('on-y');
 }
 
@@ -7889,7 +7912,7 @@ async function generateNewsletter() {
       PENN_SYSTEM,
       `Write a newsletter email for Stupid Good AI about: ${brief}\nTone: ${tone}\n\nFormat your response as:\nSUBJECT: [subject line here]\nBODY:\n[full email body, starting with "Hey [First Name]," — friendly, conversational, 150-250 words, ends with a CTA line like "[CTA: ...]"]`
     );
-    addHist('draftHist', `Newsletter · ${brief}`, 'Subject line drafted');
+    savePennHistory(`Newsletter · ${brief}`, 'Newsletter', new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }));
     const escaped = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const nlUid = 'nl_' + Date.now();
     cardContents[nlUid] = { content, platform: 'blog' };
@@ -8456,6 +8479,7 @@ initSettingsPlatChips();
 renderEngageScanHistory();
 renderScoutRailHistory();
 renderCopyHistory();
+renderPennHistory();
 // Restore Intel Feed tab age from last scan
 (function() {
   const h = getScoutHistory();
