@@ -1275,6 +1275,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <!-- ══ REELS TAB ══ -->
         <div id="pixelTabReels" class="ws-split" style="display:none;">
           <div class="ws-split-left">
+
+            <!-- KEY STATUS STRIP -->
+            <div id="reelKeyStrip" style="margin-bottom:10px;"></div>
+
             <div class="input-card">
               <div class="ic-label">Reel Brief</div>
               <textarea class="ws-ta focus-p" id="reelBrief" rows="3" placeholder="Describe the reel — e.g. 'why people waste 45 mins picking a restaurant' or 'Stupid Good vs 4 apps'"></textarea>
@@ -7376,6 +7380,7 @@ function setPixelTab(tab, el) {
   if (qaEl) qaEl.style.display = 'none';
   document.querySelectorAll('#pixelView .ws-scroll > div:first-child .chip').forEach(c => c.classList.remove('on-p'));
   if (el) el.classList.add('on-p');
+  if (isReels) renderReelKeyStrip();
 }
 
 // ── REEL ENGINE ───────────────────────────────────────────────────────────────
@@ -7500,6 +7505,33 @@ function updateCreatomateStatus() {
   const el = document.getElementById('creatomateStatus');
   if (!el) return;
   el.innerHTML = k ? '<span style="color:var(--green)">✓ Key saved</span>' : '';
+  renderReelKeyStrip();
+}
+
+function renderReelKeyStrip() {
+  const el = document.getElementById('reelKeyStrip');
+  if (!el) return;
+  const ck = getCreatomateKey();
+  const pk = getPexelsKey();
+  const elk = getElevenLabsKey();
+  const elv = getElevenLabsVoice();
+  // Only show strip if something is missing
+  const missing = [];
+  if (!ck)  missing.push({ label: 'Creatomate', note: 'required — reels won\'t render without it', color: 'var(--red)' });
+  if (!pk)  missing.push({ label: 'Pexels', note: 'optional — needed for auto B-roll', color: 'var(--yellow)' });
+  if (!elk || !elv) missing.push({ label: 'ElevenLabs voice', note: 'optional — adds voiceover', color: 'var(--muted)' });
+  if (!missing.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div style="background:rgba(255,40,31,0.06);border:1px solid rgba(255,40,31,0.18);border-radius:10px;padding:10px 14px;">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--red);margin-bottom:8px;">Keys needed in Settings</div>
+      ${missing.map(m => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px;">
+          <span style="width:6px;height:6px;border-radius:50%;background:${m.color};flex-shrink:0;"></span>
+          <span style="font-weight:700;color:var(--text);">${m.label}</span>
+          <span style="color:var(--muted);">${m.note}</span>
+        </div>`).join('')}
+      <button onclick="goAgent('settings');setTimeout(()=>document.getElementById('creatomateKeyInput')?.scrollIntoView({behavior:'smooth',block:'center'}),200)" style="margin-top:8px;padding:5px 14px;border-radius:8px;background:var(--card2);border:1px solid var(--border2);color:var(--text);font-size:11.5px;font-weight:700;cursor:pointer;">Go to Settings →</button>
+    </div>`;
 }
 
 function updateElevenLabsStatus() {
@@ -7786,8 +7818,14 @@ function buildReelSource(scenes, videoUrls, style, voiceoverUrl) {
 async function generateReel() {
   const ck = getCreatomateKey();
   if (!ck) {
-    toast('Add your Creatomate API key in Settings first', 'var(--red)');
-    goAgent('settings');
+    renderReelKeyStrip();
+    document.getElementById('reelOutput').innerHTML = `
+      <div style="padding:24px 20px;text-align:center;">
+        <div style="font-size:28px;margin-bottom:12px;">🔑</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px;">Creatomate key needed</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.6;">Add your Creatomate API key in Settings to start rendering reels.<br>creatomate.com → Project Settings → API Key</div>
+        <button onclick="goAgent('settings');setTimeout(()=>document.getElementById('creatomateKeyInput')?.scrollIntoView({behavior:'smooth',block:'center'}),200)" style="padding:8px 20px;border-radius:10px;background:var(--purple);color:#000;border:none;font-size:13px;font-weight:700;cursor:pointer;">Go to Settings →</button>
+      </div>`;
     return;
   }
   const brief = document.getElementById('reelBrief').value.trim();
