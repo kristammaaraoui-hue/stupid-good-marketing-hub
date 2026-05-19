@@ -1026,7 +1026,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div class="rh-name">Sloane</div>
         <div class="rh-lbl" style="color:var(--green);margin-top:2px;">COPY · Content Agent</div>
         <div class="rh-desc">Social copy written to your brand voice, vocabulary rules, and content pillars — automatically.</div>
-        <div class="rh-status"><div class="sdot-pulse" style="background:var(--green);box-shadow:0 0 6px var(--green)"></div><span style="color:var(--muted);font-size:11px;">Ready</span></div>
       </div>
       <div class="rail-hist">
         <div class="rht">Recent</div>
@@ -3588,11 +3587,35 @@ function updateGenBtn() {
 
 // ── COPY GENERATE ─────────────────────────────────────────────────────────────
 
+function getCopyHistory() {
+  try { return JSON.parse(localStorage.getItem('sg_copy_history') || '[]'); } catch(e) { return []; }
+}
+function saveCopyHistory(brief, count, timestamp) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const history = getCopyHistory().filter(h => !h.ts || h.ts > cutoff);
+  history.unshift({ brief, count, timestamp, ts: Date.now() });
+  if (history.length > 30) history.length = 30;
+  localStorage.setItem('sg_copy_history', JSON.stringify(history));
+  renderCopyHistory();
+}
+function renderCopyHistory() {
+  const el = document.getElementById('copyHist');
+  if (!el) return;
+  const history = getCopyHistory();
+  if (!history.length) { el.innerHTML = '<div class="rhe">No sessions yet</div>'; return; }
+  el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t">${h.brief.slice(0,32)}${h.brief.length>32?'…':''}</div><div class="hi-d">${h.count} posts · ${h.timestamp}</div></div>`).join('');
+}
+
 function generateCopy() {
   const count = copyScale === '1' ? 1 : copyScale === 'week' ? getWeekCount() : copyScale === 'month' ? getMonthCount() : parseInt(document.getElementById('customCount').value) || 10;
-  const brief = document.getElementById('copyBrief').value || 'Brand content this week';
+  // Read selected chip + textarea — chip value prepended to brief if no manual text
+  const selectedChip = document.querySelector('#copyTabGenerate .chips .chip.on-g')?.dataset?.v || '';
+  const typedBrief = document.getElementById('copyBrief').value.trim();
+  const brief = typedBrief || selectedChip || 'Brand content this week';
+  const briefLabel = typedBrief ? typedBrief : (selectedChip ? `${selectedChip} post` : 'Brand content');
   const location = (document.getElementById('copyLocation').value || '').trim();
-  addHist('copyHist', `${brief.slice(0,32)}…`, `${count} posts`);
+  const timestamp = new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+  saveCopyHistory(briefLabel, count, timestamp);
 
   if (count === 1) {
     runSimpleGenerate(brief, location);
@@ -3626,12 +3649,31 @@ function makeSinglePostCard(uid, p, txt, limits, typeLabel='') {
     ${charInfo}
     <div class="oc-actions" id="oca-${uid}">
       <button class="ocbtn ocbtn-approve" id="apbtn-${uid}" onclick="approveGeneratedPost('${uid}')">✓ Approve</button>
+      <button class="ocbtn" id="draftbtn-${uid}" onclick="saveGeneratedDraft('${uid}')">↓ Draft</button>
       <button class="ocbtn ocbtn-design" onclick="sendToPixelByUid('${uid}')">⬡ Design →</button>
       <button class="ocbtn ocbtn-sched" onclick="scheduleToBlotato('${uid}')">Schedule</button>
       <button class="ocbtn" onclick="openPostEdit('${uid}')">✎ Edit</button>
       <button class="ocbtn" onclick="navigator.clipboard.writeText(cardContents['${uid}']?.content||'');toast('Copied to clipboard')">⎘ Copy</button>
     </div>
   </div>`;
+}
+
+function saveGeneratedDraft(uid) {
+  const card = cardContents[uid];
+  if (!card) return;
+  if (!POSTS.find(p => p.id == uid)) {
+    const now = new Date();
+    POSTS.push({ id: uid, platform: card.platform, content: card.content, status: 'draft', date: now.toLocaleDateString('en-US',{month:'short',day:'numeric'}), day: now.toLocaleDateString('en-US',{weekday:'long'}), time: now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}), type: 'Post' });
+  } else {
+    POSTS.find(p => p.id == uid).status = 'draft';
+  }
+  const topBadge = document.querySelector(`#oc-${uid} .oc-top .sbadge`);
+  if (topBadge) { topBadge.textContent = 'Draft'; topBadge.className = 'sbadge s-draft'; }
+  const btn = document.getElementById(`draftbtn-${uid}`);
+  if (btn) { btn.textContent = '✓ Saved'; btn.style.color = 'var(--muted)'; btn.disabled = true; }
+  savePosts([uid]);
+  updateStats();
+  toast('Saved to drafts', 'var(--muted)');
 }
 
 async function renderSingleCopy(brief, location='') {
@@ -3778,7 +3820,7 @@ async function runBulkGenerate(count, brief, location='') {
   let totalDone = 0;
 
   const platPrompts = {
-    instagram: (n, b) => `YOUR SUBJECT — every caption must be about this and nothing else:\n\n${b}\n\n---\n\nGenerate ${n} unique Instagram captions about the SUBJECT above. FORMAT per caption: one flowing paragraph (no line breaks), ~200-320 chars. Structure: specific details + one punchy reaction + brand CTA ('Stupid Good AI finds spots like this in any city. Link in bio.'). Then: newline, period, newline, period, newline, 📍 ${location || '[Restaurant Name] ([City, State])'}, newline, #StupidGoodAI #StupidGoodPick #Eeeeeats #WorthTheTrip + relevant tags. Vary the angle and hook on each.\n\nReturn ONLY a valid JSON array, no other text:\n[{"content":"caption text","type":"Post"},...]`,
+    instagram: (n, b) => `YOUR SUBJECT — every caption must be about this and nothing else:\n\n${b}\n\n---\n\nGenerate ${n} unique Instagram captions about the SUBJECT above. FORMAT per caption: one flowing paragraph (no line breaks), ~200-320 chars. Structure: specific details + one punchy reaction + brand CTA ('Stupid Good AI finds spots like this in any city. Link in bio.').${location ? ` Then: newline, period, newline, period, newline, 📍 ${location}, newline, #StupidGoodAI #StupidGoodPick #Eeeeeats #WorthTheTrip + relevant tags.` : ' End after the CTA. No hashtags, no location line.'} Vary the angle and hook on each.\n\nReturn ONLY a valid JSON array, no other text:\n[{"content":"caption text","type":"Post"},...]`,
     x:         (n, b) => `YOUR SUBJECT — every post must be about this and nothing else:\n\n${b}\n\n---\n\nGenerate ${n} unique X/Twitter posts (max 280 chars each) about the SUBJECT above. Use specific details. Vary the angle and hook. Sharp, opinionated, no generic brand messaging. No hashtags.\n\nReturn ONLY a valid JSON array:\n[{"content":"tweet text","type":"Post"},...]`,
     tiktok:    (n, b) => `YOUR SUBJECT — every script must be about this and nothing else:\n\n${b}\n\n---\n\nGenerate ${n} unique TikTok scripts about the SUBJECT above. Use specific details from the subject. High energy, feel like a friend giving a real rec. Use format [HOOK] / [BODY] / [CTA] for each.\n\nReturn ONLY a valid JSON array:\n[{"content":"[HOOK] hook\\n\\n[BODY] body\\n\\n[CTA] cta","type":"Script"},...]`
   };
@@ -8399,25 +8441,7 @@ function approveFromTray(id) {
 }
 
 function renderCopyEmptyState() {
-  const el = document.getElementById('copyOutput');
-  if (!el || el.children.length > 0) return;
-  const briefs = [
-    {label:'Hot Take',      sub:'Contrarian opinion that sparks replies'},
-    {label:'Brand Story',   sub:'Why we built Stupid Good AI'},
-    {label:'City Guide',    sub:'Best spots in a city, curated by AI'},
-    {label:'CTA',           sub:'Drive waitlist signups'},
-    {label:'Engagement',    sub:'Ask a question, start a conversation'},
-    {label:'Product',       sub:'Spotlight a feature or benefit'}
-  ];
-  el.innerHTML = `<div style="padding:8px 0 24px;">
-    <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:12px;">Quick Start — pick a brief or just hit generate</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-      ${briefs.map(s => `<div onclick="document.querySelectorAll('#copyTabGenerate .chips .chip').forEach(c=>c.classList.remove('on-g'));document.querySelector('[data-v=&quot;${s.label}&quot;]')?.classList.add('on-g');" style="padding:11px 12px;border-radius:10px;background:rgba(0,209,145,0.05);border:1px solid rgba(0,209,145,0.15);cursor:pointer;transition:all 0.15s;" onmouseenter="this.style.background='rgba(0,209,145,0.12)';this.style.borderColor='rgba(0,209,145,0.35)';" onmouseleave="this.style.background='rgba(0,209,145,0.05)';this.style.borderColor='rgba(0,209,145,0.15)';">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;">${s.label}</div>
-        <div style="font-size:10.5px;color:var(--muted);line-height:1.4;">${s.sub}</div>
-      </div>`).join('')}
-    </div>
-  </div>`;
+  // Quick Start removed — no empty state needed
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
@@ -8431,6 +8455,7 @@ renderCopyEmptyState();
 initSettingsPlatChips();
 renderEngageScanHistory();
 renderScoutRailHistory();
+renderCopyHistory();
 // Restore Intel Feed tab age from last scan
 (function() {
   const h = getScoutHistory();
