@@ -5059,7 +5059,8 @@ Return ONLY valid JSON, no text outside it:
       "brand": "brand name",
       "platform": "instagram|twitter|tiktok|newsletter|web",
       "type": "Campaign|Content|Newsletter|Feature|Event",
-      "date": "readable recent date",
+      "date": "readable recent date (e.g. 'May 2025', 'Early May 2025')",
+      "dateSort": "YYYY-MM-DD approximate date for sorting, e.g. '2025-05-15'",
       "title": "short title of what they posted or launched",
       "summary": "2-3 sentences describing what they did and engagement/reach",
       "angle": "1-2 sentences: our counter-angle or what we can learn from this"
@@ -7625,7 +7626,12 @@ function loadScoutScan(index) {
 function renderScoutIntelFromCache(parsed, label) {
   const feed = document.getElementById('scoutIntelFeed');
   if (!feed) return;
-  const intel = parsed.intel || [];
+  // Sort intel newest-first using dateSort field (falls back to array order)
+  const intel = (parsed.intel || []).slice().sort((a, b) => {
+    const da = a.dateSort || a.date || '';
+    const db = b.dateSort || b.date || '';
+    return db.localeCompare(da);
+  });
   const ideas = parsed.ideas || [];
   const trends = parsed.trends || [];
   feed.innerHTML = `
