@@ -804,8 +804,8 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
 
       <!-- GREETING -->
       <div style="padding:16px 14px 12px;">
-        <div style="font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:1px;" id="ccGreeting">Good morning, Krista</div>
-        <div style="font-size:10px;color:var(--muted2);" id="ccDate"></div>
+        <div style="font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:1px;" id="ccGreetingSidebar">Good morning, Krista</div>
+        <div style="font-size:10px;color:var(--muted2);" id="ccDateSidebar"></div>
       </div>
 
       <div style="height:1px;background:var(--border);margin:0 14px;"></div>
@@ -1619,9 +1619,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
       </div>
       <div class="rail-hist">
         <div class="rht">Last Scans</div>
-        <div class="hi"><div class="hi-t" style="color:var(--muted)">Today · 6:00 PM</div><div class="hi-d">14 matches found</div></div>
-        <div class="hi"><div class="hi-t" style="color:var(--muted)">Today · 1:00 PM</div><div class="hi-d">9 matches found</div></div>
-        <div class="hi"><div class="hi-t" style="color:var(--muted)">Today · 8:00 AM</div><div class="hi-d">21 matches found</div></div>
+        <div id="engageScanHistory"><div class="rhe">No scans yet</div></div>
       </div>
     </div>
     <div class="ws-main">
@@ -2040,11 +2038,11 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           </div>
           <div class="settings-row">
             <div><div class="settings-row-label">Platforms to generate</div><div class="settings-row-sub">Which platforms get daily suggestions</div></div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="chip on-g" style="font-size:11px;">Instagram</button>
-              <button class="chip on-g" style="font-size:11px;">X / Twitter</button>
-              <button class="chip on-g" style="font-size:11px;">TikTok</button>
-              <button class="chip on-g" style="font-size:11px;">Blog</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;" id="settingsPlatChips">
+              <button class="chip on-g" data-plat="instagram" style="font-size:11px;" onclick="toggleSettingsPlat(this)">Instagram</button>
+              <button class="chip on-g" data-plat="x" style="font-size:11px;" onclick="toggleSettingsPlat(this)">X / Twitter</button>
+              <button class="chip on-g" data-plat="tiktok" style="font-size:11px;" onclick="toggleSettingsPlat(this)">TikTok</button>
+              <button class="chip on-g" data-plat="blog" style="font-size:11px;" onclick="toggleSettingsPlat(this)">Blog</button>
             </div>
           </div>
         </div>
@@ -2814,6 +2812,26 @@ function platBadge(platform, size=26) {
 }
 
 function goHome() { show('homeView'); }
+
+function toggleSettingsPlat(btn) {
+  const plat = btn.dataset.plat;
+  const isOn = btn.classList.toggle('on-g');
+  try {
+    const stored = JSON.parse(localStorage.getItem('sg_auto_plats') || '["instagram","x","tiktok","blog"]');
+    const updated = isOn ? [...new Set([...stored, plat])] : stored.filter(p => p !== plat);
+    localStorage.setItem('sg_auto_plats', JSON.stringify(updated));
+  } catch(e) {}
+  toast(isOn ? `${btn.textContent} added to daily generation` : `${btn.textContent} removed from daily generation`);
+}
+
+function initSettingsPlatChips() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('sg_auto_plats') || '["instagram","x","tiktok","blog"]');
+    document.querySelectorAll('#settingsPlatChips [data-plat]').forEach(btn => {
+      btn.classList.toggle('on-g', stored.includes(btn.dataset.plat));
+    });
+  } catch(e) {}
+}
 function goSettings() { show('settingsView'); updateStats(); }
 function goAudit() { show('auditView'); updateStats(); }
 
@@ -2822,10 +2840,10 @@ function goAudit() { show('auditView'); updateStats(); }
 let planDuration = 30;
 
 function setCopyTab(tab, el) {
-  document.getElementById('copyTabGenerate').style.display = tab === 'generate' ? 'flex' : 'none';
-  document.getElementById('copyTabQA').style.display = tab === 'qa' ? 'flex' : 'none';
-  ['copy-tab-generate','copy-tab-qa'].forEach(id => document.getElementById(id)?.classList.remove('on-g'));
-  el.classList.add('on-g');
+  const gen = document.getElementById('copyTabGenerate');
+  if (gen) gen.style.display = tab === 'generate' ? 'flex' : 'none';
+  document.getElementById('copy-tab-generate')?.classList.remove('on-g');
+  if (el) el.classList.add('on-g');
 }
 
 function setPlanDuration(days, el) {
@@ -4236,25 +4254,30 @@ function editDesign(n) {
 }
 
 function applyDesignEdits(n) {
-  const headline = document.getElementById('editHeadline').value;
-  const subtext  = document.getElementById('editSubtext').value;
-  const notes    = document.getElementById('editInstructions').value;
+  const headline = (document.getElementById('editHeadline')?.value || '').trim();
+  const subtext  = (document.getElementById('editSubtext')?.value || '').trim();
+  const notes    = (document.getElementById('editInstructions')?.value || '').trim();
   const chips    = [...document.querySelectorAll('#styleChips .chip.on-p')].map(c=>c.dataset.v);
 
-  // Show applying state
-  const applyBtn = document.querySelector('#designEditPanel .gb-purple');
-  applyBtn.innerHTML = '<div class="spinner sp-p" style="width:14px;height:14px;border-width:2px;"></div> Applying…';
-  applyBtn.disabled = true;
+  const baseDesign = window._currentDesigns && window._currentDesigns[n-1];
+  const lines = [
+    `Design edit request for Option ${n}${baseDesign ? ` (${baseDesign.template_name || 'Nova\'s choice'})` : ''}:`,
+    headline ? `Headline: ${headline}` : '',
+    subtext  ? `Subtext: ${subtext}` : '',
+    chips.length ? `Style changes: ${chips.join(', ')}` : '',
+    notes ? `Additional notes: ${notes}` : '',
+  ].filter(Boolean);
+  const brief = lines.join('\n');
 
-  setTimeout(() => {
-    toast(`Option ${n} updated in Canva`, 'var(--purple)');
-    document.getElementById('designEditPanel').style.display = 'none';
-    activeEditDesign = null;
-    document.querySelectorAll('.design-card').forEach(c => c.style.borderColor = '');
-    // Reset button
-    applyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg> Apply Changes in Canva';
-    applyBtn.disabled = false;
-  }, 1800);
+  navigator.clipboard.writeText(brief).then(() => {
+    toast('Edit brief copied — paste into Canva or Claude to apply changes', 'var(--purple)');
+  }).catch(() => {
+    toast('Could not copy — see brief in console', 'var(--red)');
+    console.log('[Nova edit brief]\n' + brief);
+  });
+  document.getElementById('designEditPanel').style.display = 'none';
+  activeEditDesign = null;
+  document.querySelectorAll('.design-card').forEach(c => c.style.borderColor = '');
 }
 
 // ── DRAFT GENERATE ────────────────────────────────────────────────────────────
@@ -4440,33 +4463,35 @@ function approveAllRepurpose() {
 }
 
 function publishBlog() {
-  const sec = document.getElementById('repurposeSection') || document.createElement('div');
+  const content = window._currentBlogFull || '';
+  if (!content) { toast('No blog content to copy yet — generate a post first', 'var(--yellow)'); return; }
   const existing = document.getElementById('publishBar');
-  if (existing) { toast('Already publishing…'); return; }
+  if (existing) { existing.remove(); }
   const bar = document.createElement('div');
   bar.id = 'publishBar';
   bar.className = 'publish-bar';
   bar.innerHTML = `
     <div class="pb-left">
       <div class="pb-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg></div>
-      <div><div class="pb-ttl">Ready to publish</div><div class="pb-sub">Will post to your blog subdomain via API</div></div>
+      <div><div class="pb-ttl">Copy & publish manually</div><div class="pb-sub">Copy the full draft, then paste into Ghost, Beehiiv, Substack, or your CMS of choice</div></div>
     </div>
     <div style="display:flex;gap:7px;">
-      <button class="ocbtn" style="font-size:12px;" onclick="toast('To schedule: approve the post in your Queue and use Schedule via Blotato','var(--yellow)')">Schedule →</button>
-      <button class="ocbtn ocbtn-approve" style="font-size:12px;" onclick="doPublish(this)">⬆ Publish Now</button>
+      <button class="ocbtn" style="font-size:12px;" onclick="document.getElementById('publishBar')?.remove()">Dismiss</button>
+      <button class="ocbtn ocbtn-approve" id="publishCopyBtn" style="font-size:12px;" onclick="doPublish(this)">⎘ Copy Full Draft</button>
     </div>`;
-  sec.appendChild(bar);
   document.getElementById('draftOutput').appendChild(bar);
 }
 
 function doPublish(btn) {
-  btn.textContent = 'Publishing…';
-  btn.disabled = true;
-  setTimeout(() => {
-    btn.textContent = '✓ Published';
+  const content = window._currentBlogFull || '';
+  if (!content) { toast('No content to copy', 'var(--red)'); return; }
+  navigator.clipboard.writeText(content).then(() => {
+    btn.textContent = '✓ Copied';
     btn.style.background = 'rgba(0,209,145,0.25)';
-    toast('Blog post published to your subdomain', 'var(--green)');
-  }, 1600);
+    toast('Blog draft copied — paste into your CMS to publish', 'var(--green)');
+  }).catch(() => {
+    toast('Copy failed — use the ⎘ Copy button above instead', 'var(--red)');
+  });
 }
 
 // ── QUEUE ─────────────────────────────────────────────────────────────────────
@@ -6241,10 +6266,33 @@ function parseJaxCSV(text) {
   }).filter(r => r.tweet_id);
 }
 
+function recordJaxScan(matchCount) {
+  try {
+    const history = JSON.parse(localStorage.getItem('jax_scan_history') || '[]');
+    const now = new Date();
+    const timeStr = now.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
+    history.unshift({ time: timeStr, count: matchCount });
+    if (history.length > 5) history.length = 5;
+    localStorage.setItem('jax_scan_history', JSON.stringify(history));
+    renderEngageScanHistory();
+  } catch(e) {}
+}
+
+function renderEngageScanHistory() {
+  const el = document.getElementById('engageScanHistory');
+  if (!el) return;
+  try {
+    const history = JSON.parse(localStorage.getItem('jax_scan_history') || '[]');
+    if (!history.length) { el.innerHTML = '<div class="rhe">No scans yet</div>'; return; }
+    el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t" style="color:var(--muted)">${h.time}</div><div class="hi-d">${h.count} ${h.count === 1 ? 'match' : 'matches'} found</div></div>`).join('');
+  } catch(e) { el.innerHTML = '<div class="rhe">No scans yet</div>'; }
+}
+
 async function loadJaxQueue() {
   const el = document.getElementById('jaxReviewQueue');
   const status = document.getElementById('jaxQueueStatus');
   if (!el) return;
+  renderEngageScanHistory();
   el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0;">Loading…</div>';
   try {
     const res = await fetch(JAX_SHEET_CSV + '&t=' + Date.now());
@@ -6269,6 +6317,7 @@ async function loadJaxQueue() {
       .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
     const warn = document.getElementById('jaxFollowerWarn');
     if (warn) warn.style.display = (!hasFollowerData && ffOn) ? 'block' : 'none';
+    recordJaxScan(allPending.length);
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
       el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies. JAX will surface new opportunities on the next n8n scan.</div></div>';
@@ -7705,7 +7754,7 @@ async function generateNewsletter() {
         <pre id="nlContent-${nlUid}" style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;line-height:1.7;color:var(--text);">${escaped}</pre>
         <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">
           <button onclick="navigator.clipboard.writeText(cardContents['${nlUid}']?.content||'');toast('Newsletter copied to clipboard')" style="padding:6px 12px;border-radius:7px;background:rgba(255,217,17,0.1);border:1px solid rgba(255,217,17,0.3);color:var(--yellow);font-size:11px;font-weight:700;cursor:pointer;">⎘ Copy</button>
-          <button onclick="toast('Exported to Beehiiv draft','var(--yellow)')" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:11px;cursor:pointer;">→ Export to Beehiiv</button>
+          <button onclick="navigator.clipboard.writeText(cardContents['${nlUid}']?.content||'').then(()=>toast('Copied — paste into Beehiiv, Mailchimp, or your ESP','var(--yellow)')).catch(()=>toast('Copy failed','var(--red)'))" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:11px;cursor:pointer;">⎘ Copy for ESP</button>
           <button id="nlQueueBtn-${nlUid}" onclick="approveGeneratedPost('${nlUid}');this.textContent='✓ Added';this.disabled=true;" style="padding:6px 12px;border-radius:7px;background:rgba(0,209,145,0.1);border:1px solid rgba(0,209,145,0.3);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;">+ Add to Queue</button>
         </div>
       </div>`;
@@ -8039,10 +8088,16 @@ function renderCommandCenter() {
   const greeting = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const WDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const greetEl = document.getElementById('ccGreeting');
-  const dateEl  = document.getElementById('ccDate');
-  if (greetEl) greetEl.textContent = `${greeting}, Krista`;
-  if (dateEl)  dateEl.textContent  = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const greetEl  = document.getElementById('ccGreeting');
+  const dateEl   = document.getElementById('ccDate');
+  const greetSb  = document.getElementById('ccGreetingSidebar');
+  const dateSb   = document.getElementById('ccDateSidebar');
+  const greetTxt = `${greeting}, Krista`;
+  const dateTxt  = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  if (greetEl) greetEl.textContent = greetTxt;
+  if (dateEl)  dateEl.textContent  = dateTxt;
+  if (greetSb) greetSb.textContent = greetTxt;
+  if (dateSb)  dateSb.textContent  = dateTxt;
 
   // Compute today + this week
   const todayDay  = WDAYS[now.getDay()];
@@ -8258,6 +8313,8 @@ updatePixelSizes();
 updateGenBtn();
 renderCommandCenter();
 renderCopyEmptyState();
+initSettingsPlatChips();
+renderEngageScanHistory();
 
 // ── BLOG PREVIEW ─────────────────────────────────────────────────────────────
 
