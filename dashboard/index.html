@@ -2033,20 +2033,15 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <div class="settings-card-head">
             <div>
               <div class="settings-card-title">X / Twitter</div>
-              <div class="settings-card-sub">Used by COPY (scheduling) and ENGAGE (replies, scanning)</div>
+              <div class="settings-card-sub">ENGAGE replies post via your n8n workflow — no API key needed here</div>
             </div>
-            <button class="settings-connect-btn connected" onclick="toast('X account already connected','var(--green)')">✓ Connected</button>
+            <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(0,209,145,0.1);color:var(--green);border:1px solid rgba(0,209,145,0.25);">✓ Via n8n</span>
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Account</div><div class="settings-row-sub">@stupidgoodai</div></div>
-            <button class="settings-connect-btn" onclick="toast('Reconnecting X account…')">Reconnect</button>
+            <div><div class="settings-row-label">Account</div><div class="settings-row-sub">@stupidgoodai · replies handled by your n8n approve-reply workflow</div></div>
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">API Key</div><div class="settings-row-sub">Used for ENGAGE scanning and reply posting</div></div>
-            <input type="password" class="settings-input" value="xxxx-xxxx-xxxx-demo" placeholder="X API Key" style="width:200px;">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-row-label">Scan keywords</div><div class="settings-row-sub">Comma-separated triggers for ENGAGE</div></div>
+            <div><div class="settings-row-label">Scan keywords</div><div class="settings-row-sub">Comma-separated triggers — n8n uses these to surface reply opportunities</div></div>
             <input type="text" class="settings-input" id="settingsKeywordInput" value="where should we eat tonight, restaurant recommendation tonight, help me find somewhere to eat, where should I eat, can't decide where to eat, need a dinner recommendation, yelp reviews are useless, yelp is useless, google reviews are useless, can't trust restaurant reviews, too many food apps, checked TikTok Instagram Reddit still can't decide, decision fatigue food, where to eat tonight, just found a hidden gem restaurant, no one is talking about this restaurant, underrated restaurant, date night restaurant, need a restaurant for a date, restaurant that says I planned this, planning a romantic dinner, tasting menus are a scam, hot take dining, restaurant hot take, overrated restaurant, where to eat in, best restaurants in, food, restaurant, foodie, dining, AI food" placeholder="Keywords…">
           </div>
         </div>
@@ -2110,56 +2105,47 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           </div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" style="opacity:0.75;">
           <div class="settings-card-head">
             <div>
               <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">Reddit <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(255,69,0,0.1);color:#ff4500;border:1px solid rgba(255,69,0,0.2);">ENGAGE</span></div>
-              <div class="settings-card-sub">Monitors subreddits for food/restaurant mentions to engage with</div>
+              <div class="settings-card-sub">Monitors subreddits for food/restaurant keyword matches</div>
             </div>
-            <button class="settings-connect-btn reddit-c" id="redditConnectBtn" onclick="connectReddit()">Connect Reddit</button>
+            <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--card2);color:var(--muted);border:1px solid var(--border2);">Not connected</span>
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Reddit Client ID</div><div class="settings-row-sub">From reddit.com/prefs/apps → create app</div></div>
-            <input type="text" class="settings-input" id="redditClientId" placeholder="Reddit Client ID">
+            <div><div class="settings-row-label">Reddit Client ID</div><div class="settings-row-sub">reddit.com/prefs/apps → create app → script type</div></div>
+            <input type="text" class="settings-input" id="redditClientId" placeholder="Reddit Client ID" oninput="localStorage.setItem('sg_reddit_client_id',this.value.trim())">
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Reddit Client Secret</div><div class="settings-row-sub">Shown when you create the app (free)</div></div>
-            <input type="password" class="settings-input" id="redditSecret" placeholder="Reddit Client Secret">
+            <div><div class="settings-row-label">Reddit Client Secret</div><div class="settings-row-sub">Shown after app creation (free)</div></div>
+            <input type="password" class="settings-input" id="redditSecret" placeholder="Reddit Client Secret" oninput="localStorage.setItem('sg_reddit_secret',this.value.trim())">
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Subreddits to watch</div><div class="settings-row-sub">Comma-separated</div></div>
-            <input type="text" class="settings-input" value="FoodNYC, AskNYC, Austin, food, chicago, LosAngeles" placeholder="Subreddits…">
-          </div>
-          <div class="settings-row">
-            <div><div class="settings-row-label">Scan frequency</div><div class="settings-row-sub">How often ENGAGE checks Reddit</div></div>
-            <select class="settings-input" style="width:160px;">
-              <option>3× daily</option>
-              <option>1× daily</option>
-              <option>Every 6 hours</option>
-              <option>Manual only</option>
-            </select>
+            <div><div class="settings-row-label">Subreddits to watch</div><div class="settings-row-sub">Comma-separated — saves automatically</div></div>
+            <input type="text" class="settings-input" id="redditSubreddits" placeholder="FoodNYC, AskNYC, Austin, food…" oninput="localStorage.setItem('sg_reddit_subreddits',this.value.trim())">
           </div>
         </div>
 
-        <div class="settings-card">
+        <div class="settings-card" style="opacity:0.75;">
           <div class="settings-card-head">
             <div>
               <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">Discord <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(88,101,242,0.1);color:#5865f2;border:1px solid rgba(88,101,242,0.2);">ENGAGE</span></div>
               <div class="settings-card-sub">Bot monitors food servers and surfaces engagement opportunities</div>
             </div>
-            <button class="settings-connect-btn discord-c" id="discordConnectBtn" onclick="connectDiscord()">Connect Discord</button>
+            <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--card2);color:var(--muted);border:1px solid var(--border2);">Not connected</span>
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Bot Token</div><div class="settings-row-sub">From discord.com/developers/applications → Bot</div></div>
-            <input type="password" class="settings-input" id="discordToken" placeholder="Discord Bot Token">
+            <div><div class="settings-row-label">Bot Token</div><div class="settings-row-sub">discord.com/developers/applications → your app → Bot → Reset Token</div></div>
+            <input type="password" class="settings-input" id="discordToken" placeholder="Discord Bot Token" oninput="localStorage.setItem('sg_discord_token',this.value.trim())">
           </div>
           <div class="settings-row">
-            <div><div class="settings-row-label">Servers to monitor</div><div class="settings-row-sub">Bot must be invited to these servers</div></div>
-            <input type="text" class="settings-input" value="Eater NYC, NYC Food Lovers, Austin Food Community" placeholder="Server names…">
+            <div><div class="settings-row-label">Servers to monitor</div><div class="settings-row-sub">Bot must be invited to each server first</div></div>
+            <input type="text" class="settings-input" id="discordServers" placeholder="Eater NYC, NYC Food Lovers…" oninput="localStorage.setItem('sg_discord_servers',this.value.trim())">
           </div>
           <div class="settings-row">
             <div><div class="settings-row-label">Channels to watch</div><div class="settings-row-sub">Comma-separated channel names</div></div>
-            <input type="text" class="settings-input" value="#restaurant-recs, #where-to-eat, #hidden-gems, #general" placeholder="#channels…">
+            <input type="text" class="settings-input" id="discordChannels" placeholder="#restaurant-recs, #where-to-eat…" oninput="localStorage.setItem('sg_discord_channels',this.value.trim())">
           </div>
         </div>
 
@@ -2963,6 +2949,22 @@ function showBlotatoSyncBanner(count) {
     localStorage.setItem('sg_n8n_url', 'https://stupidgoodai.app.n8n.cloud');
   }
   if (typeof updateN8nStatus === 'function') updateN8nStatus();
+
+  // Reddit fields
+  const rid = localStorage.getItem('sg_reddit_client_id') || '';
+  const rsec = localStorage.getItem('sg_reddit_secret') || '';
+  const rsubs = localStorage.getItem('sg_reddit_subreddits') || '';
+  if (rid)   { const el = document.getElementById('redditClientId');  if (el) el.value = rid; }
+  if (rsec)  { const el = document.getElementById('redditSecret');    if (el) el.value = rsec; }
+  if (rsubs) { const el = document.getElementById('redditSubreddits'); if (el) el.value = rsubs; }
+
+  // Discord fields
+  const dtok = localStorage.getItem('sg_discord_token') || '';
+  const dsrv = localStorage.getItem('sg_discord_servers') || '';
+  const dch  = localStorage.getItem('sg_discord_channels') || '';
+  if (dtok) { const el = document.getElementById('discordToken');    if (el) el.value = dtok; }
+  if (dsrv) { const el = document.getElementById('discordServers');  if (el) el.value = dsrv; }
+  if (dch)  { const el = document.getElementById('discordChannels'); if (el) el.value = dch; }
 })();
 
 // ── PLATFORM ICON HELPER ─────────────────────────────────────────────────────
@@ -3528,27 +3530,8 @@ function renderAuditResults(plat, liveData) {
 
     </div>`;
 }
-function connectReddit() {
-  const id = document.getElementById('redditClientId')?.value;
-  const secret = document.getElementById('redditSecret')?.value;
-  if (!id || !secret) { toast('Enter your Reddit Client ID and Secret first','#ff4500'); return; }
-  const btn = document.getElementById('redditConnectBtn');
-  if (btn) { btn.textContent = 'Connecting…'; btn.disabled = true; }
-  setTimeout(() => {
-    if (btn) { btn.textContent = '✓ Connected'; btn.classList.add('connected'); btn.style.color='var(--green)'; btn.style.borderColor='rgba(0,209,145,0.3)'; btn.disabled = false; }
-    toast('Reddit connected — ENGAGE will scan on next cycle','#ff4500');
-  }, 1400);
-}
-function connectDiscord() {
-  const token = document.getElementById('discordToken')?.value;
-  if (!token) { toast('Enter your Discord Bot Token first','#5865f2'); return; }
-  const btn = document.getElementById('discordConnectBtn');
-  if (btn) { btn.textContent = 'Connecting…'; btn.disabled = true; }
-  setTimeout(() => {
-    if (btn) { btn.textContent = '✓ Connected'; btn.classList.add('connected'); btn.style.color='var(--green)'; btn.style.borderColor='rgba(0,209,145,0.3)'; btn.disabled = false; }
-    toast('Discord bot connected — monitoring active','#5865f2');
-  }, 1400);
-}
+// connectReddit / connectDiscord removed — were fake setTimeout simulations.
+// Reddit and Discord will be wired through n8n when added. Fields save to localStorage.
 function goAgent(a) {
   if (a === 'engage') { show('engageView'); initJaxFollowerFilter(); renderJaxKeywords(); loadJaxQueue(); return; }
   if (a === 'calendar') { renderCalendar(); show('calendarView'); return; }
