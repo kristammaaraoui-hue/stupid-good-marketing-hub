@@ -1765,6 +1765,24 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div id="jaxReviewQueue">
           <div style="color:var(--muted);font-size:13px;padding:20px 0;">Loading…</div>
         </div>
+
+        <!-- QA PANEL — inline reply checker -->
+        <div id="jaxQAPanel" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:700;">Reply QA</div>
+            <div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,40,31,0.1);color:var(--red);border:1px solid rgba(255,40,31,0.2);">6 checks</div>
+            <div style="font-size:11px;color:var(--muted);">Paste any reply draft — checks tone, length, and brand voice before you post.</div>
+          </div>
+          <textarea id="engageQAInput" class="ws-ta" rows="3" placeholder="Paste a reply draft to check before posting…" style="border-color:rgba(255,40,31,0.2);margin-bottom:10px;"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+            <button class="genbtn" style="background:var(--red);color:#fff;padding:8px 18px;font-size:12px;" onclick="runEngageQA()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Check Reply
+            </button>
+          </div>
+          <div id="jaxQAOutput"></div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -6155,450 +6173,8 @@ If you care about food, can't stand decision fatigue, and love being the friend 
 };
 
 // ── ENGAGE AGENT ─────────────────────────────────────────────────────────────
-
-const ENGAGE_FEED = [
-  { id:'e1', type:'reply', user:'@foodienyc', handle:'@foodienyc', followers:'12.4K', content:"honestly the restaurant discovery problem is so broken. i spent 40 mins on yelp last night and still ended up somewhere mid", aiReply:"40 minutes and still 'pretty good.' That math doesn't work. Stupid Good AI gives you 3 picks built around your actual taste — not the crowd's average. Free. Launching soon.", time:'2h ago', likes:47 },
-  { id:'e2', type:'reply', user:'@dinewithdan', handle:'@dinewithdan', followers:'8.1K', content:"can someone please make an app that gives me ONE good restaurant recommendation instead of 50 mediocre ones", aiReply:"One answer. Built around what you actually like — not ranked by strangers who may love things you hate. That's the whole idea. Stupid Good AI, free to join.", time:'3h ago', likes:112 },
-  { id:'e3', type:'retweet', user:'@techfoodie', handle:'@techfoodie', followers:'31K', content:"AI is going to completely change how we find restaurants. Not just better search — actual personalization based on what you like, your vibe, your history. Can't wait to see what's coming.", time:'4h ago', likes:284 },
-  { id:'e4', type:'reply', user:'@latebite', handle:'@latebite', followers:'5.6K', content:"yelp has 47 thai restaurants near me. all 4.5 stars. zero help whatsoever", aiReply:"A 4.5 average from 3,000 people who don't know your taste tells you almost nothing. We match to your Taste Graph — not the consensus. Waitlist is open.", time:'5h ago', likes:89 },
-  { id:'e5', type:'reply', user:'@openrestaurant', handle:'@openrestaurant', followers:'22K', content:"the group chat is still the most reliable restaurant recommendation engine ever built", aiReply:"It works because it actually knows you. We're building the version that's available at midnight in a city you've never been to. Same energy, smarter memory.", time:'6h ago', likes:203 },
-  { id:'e6', type:'retweet', user:'@foodtech_weekly', handle:'@foodtech_weekly', followers:'44K', content:"The next big opportunity in food tech isn't delivery. It's discovery. Nobody has solved personalized restaurant recommendation yet.", time:'7h ago', likes:512 },
-  { id:'e7', type:'reply', user:'@eatingwithamy', handle:'@eatingwithamy', followers:'9.3K', content:"why does every food app just show me the same 10 trendy spots. i want to find the places that locals actually love", aiReply:"Because most apps optimize for what's popular, not what's right for you. Local flavor, your taste — that's the whole premise. Stupid Good AI, free to join.", time:'8h ago', likes:156 },
-  { id:'e8', type:'reply', user:'@mealplanning101', handle:'@mealplanning101', followers:'6.7K', content:"decision fatigue from restaurant apps is real. too many choices, none of them feel right", aiReply:"Decision fatigue is a design failure, not a you problem. Three picks. Context. No noise. That's what Stupid Good AI is built to solve.", time:'9h ago', likes:74 },
-  { id:'e9', type:'retweet', user:'@restaurantbiz', handle:'@restaurantbiz', followers:'67K', content:"The best restaurants in any city aren't the ones with the most marketing — they're the ones found by the right people at the right time.", time:'10h ago', likes:891 },
-];
-
-const FOLLOW_SUGGESTIONS = [
-  { handle:'@foodtech_insider', name:'FoodTech Insider', followers:'48.2K', category:'Food Tech', reason:'Covers AI in food discovery weekly. High engagement from your target audience.', bio:'Tracking where food & tech collide. AI, delivery, discovery, and the future of eating out.' },
-  { handle:'@restaurantdive', name:'Restaurant Dive', followers:'112K', category:'Industry News', reason:'Major food industry publication. Frequent content about restaurant trends your audience follows.', bio:'Restaurant industry news, analysis, and insights for operators and investors.' },
-  { handle:'@eater', name:'Eater', followers:'890K', category:'Food Media', reason:'Key food media account. Their audience overlaps heavily with Stupid Good AI target users.', bio:'The go-to guide for where and what to eat across America and beyond.' },
-  { handle:'@bonappetit', name:'Bon Appétit', followers:'2.1M', category:'Food Media', reason:'Engaged foodie audience with strong opinions — exactly who joins waitlists early.', bio:'Food, cooking, and culture. Recipes, restaurant guides, and the stories behind them.' },
-  { handle:'@foodandwine', name:'Food & Wine', followers:'1.4M', category:'Food Media', reason:'Strong lifestyle food audience. Good for brand awareness with upscale food enthusiasts.', bio:'Everything you need to eat and drink well. Recipes, restaurants, and the culture of food.' },
-  { handle:'@techinasia_food', name:'Tech in Asia Food', followers:'34.5K', category:'Food Tech', reason:'Food tech startup community — potential partners, press, and early adopters.', bio:'Covering food technology startups across Asia and globally.' },
-  { handle:'@infatuation', name:'The Infatuation', followers:'320K', category:'Restaurant Discovery', reason:'Direct space competitor with large, engaged audience. Great for engagement bait and brand positioning.', bio:'Restaurant recommendations for real people. NYC, LA, and cities across the world.' },
-  { handle:'@yelp', name:'Yelp', followers:'280K', category:'Competitor', reason:'Monitoring competitor content — useful for positioning and finding frustrated users to engage.', bio:'Find great businesses. Read real reviews. Yelp.' },
-  { handle:'@seriouseats', name:'Serious Eats', followers:'580K', category:'Food Media', reason:'Deeply knowledgeable food audience. These are the people who care most about where they eat.', bio:'Food science, recipes, and obsessive coverage of where and what to eat.' },
-  { handle:'@foodcuratornyc', name:'Food Curator NYC', followers:'67K', category:'Food Influencer', reason:'City-level food influencer — local recommendation content creator with target audience overlap.', bio:'Finding NYC\'s best hidden gems so you don\'t have to. Restaurant recs, food tours, no fluff.' },
-  { handle:'@techcrunch_food', name:'TechCrunch Food', followers:'4.2M', category:'Tech Media', reason:'Tech startup coverage. Good for awareness in the tech/startup community as you approach launch.', bio:'Technology news and analysis from TechCrunch.' },
-  { handle:'@tablehopper', name:'Tablehopper', followers:'43K', category:'Food Influencer', reason:'SF food influencer with loyal restaurant-obsessed following. Early adopter profile.', bio:'SF\'s most trusted restaurant insider. Marcia Gagliardi on where to eat in the Bay Area.' },
-];
-
-let engageFilter = 'all';
-
-function goEngage() {
-  renderEngageFeed();
-  show('engageView');
-  initEngageSchedule();
-  checkEngageAutoScan();
-}
-const REDDIT_FEED = [
-  { id:'r1', subreddit:'r/FoodNYC', title:'Where can I find the best hidden gem restaurants in Manhattan right now?', author:'u/foodie_nyc', upvotes:142, comments:38, time:'2h ago', aiReply:"If you want spots the algorithm hasn't touched yet — Stupid Good AI curates exactly that. Personalized picks, no PR noise. Try it free: stupidgood.ai" },
-  { id:'r2', subreddit:'r/AskNYC', title:"I moved here 3 months ago and still can't figure out how to find good food without Yelp. Help?", author:'u/transplant_eater', upvotes:87, comments:54, time:'4h ago', aiReply:"Yelp is great for volume, rough for taste matching. Stupid Good AI is built for exactly your problem — it learns what you like and gives you 3 picks instead of 47. Worth a try: stupidgood.ai" },
-  { id:'r3', subreddit:'r/Austin', title:'Locals only: what restaurants do you wish tourists would stop going to so you can get a reservation?', author:'u/austinite_real', upvotes:2.1, comments:211, time:'6h ago', aiReply:"This is exactly the intel Stupid Good AI is built on — real local taste, not whatever's trending on TripAdvisor. If you're ever willing to share your picks, we'd love to build Austin's best insider list together." },
-  { id:'r4', subreddit:'r/food', title:"I've been using every food app for 5 years and none of them actually learn my preferences. Is this solved yet?", author:'u/perpetually_hungry', upvotes:318, comments:92, time:'1d ago', aiReply:"Actually, yes — this is the exact problem Stupid Good AI was built to solve. It builds a Taste Graph around your preferences and gets smarter with every rating. Free waitlist open now at stupidgood.ai" },
-  { id:'r5', subreddit:'r/chicago', title:"What's the actual best deep dish in Chicago that isn't on every tourist list?", author:'u/chi_local', upvotes:445, comments:167, time:'3h ago', aiReply:"The best spots never make the lists — which is the whole premise behind Stupid Good AI. We surface the places local insiders actually love, not the ones that pay for placement. Check it out: stupidgood.ai" },
-];
-
-const DISCORD_FEED = [
-  { id:'d1', server:'Eater NYC Discord', channel:'#restaurant-recs', user:'@maya.eats', content:"does anyone actually have a good system for finding new restaurants? every app gives me the same 10 places", time:'Today at 11:32 AM', aiReply:"We built Stupid Good AI specifically for this — it stops cycling you through the same tired recommendations and actually learns your taste. Free to try: stupidgood.ai" },
-  { id:'d2', server:'NYC Food Lovers', channel:'#where-to-eat', user:'@diningdave', content:"group dinner for 8 this friday, budget $80/person, need somewhere that's actually good not just hype. send help", time:'Today at 2:15 PM', aiReply:"Group dinners are one of Stupid Good AI's best use cases — it filters for occasion, party size, and budget, not just stars. Link: stupidgood.ai — or DM me and I'll help narrow it down." },
-  { id:'d3', server:'Austin Food Community', channel:'#hidden-gems', user:'@ATX_foodie', content:"I'm SO tired of Google Maps 'Popular on Google' recommendations. It's the same 20 spots every time", time:'Yesterday at 8:44 PM', aiReply:"That's exactly the problem Stupid Good AI was built to fix — signal over noise, local context over popularity scores. Worth a look: stupidgood.ai" },
-  { id:'d4', server:'SF Eats', channel:'#general', user:'@fogcityfoodie', content:"serious question: is there any AI food rec tool that's actually good? not just ChatGPT with a food skin", aiReply:"Yes — that's Stupid Good AI. It builds a personalized Taste Graph around your actual preferences rather than just pulling from generic training data. Free waitlist: stupidgood.ai", time:'Today at 9:05 AM' },
-];
-
-function setEngageFilter(f, el) {
-  engageFilter = f;
-  document.querySelectorAll('#engageView .chip').forEach(c => { c.classList.remove('on-g'); });
-  el.classList.add('on-g');
-  const feed = document.getElementById('engageFeed');
-  const followDiv = document.getElementById('followSuggestions');
-  const redditDiv = document.getElementById('redditFeed');
-  const discordDiv = document.getElementById('discordFeed');
-  const commDiv = document.getElementById('communityManagerFeed');
-  const qaDiv = document.getElementById('engageQAFeed');
-  [feed, followDiv, redditDiv, discordDiv, commDiv, qaDiv].forEach(d => { if(d) d.style.display = 'none'; });
-  if (f === 'follow') {
-    followDiv.style.display = 'block';
-    renderFollowSuggestions();
-  } else if (f === 'reddit') {
-    redditDiv.style.display = 'block';
-    renderRedditFeed();
-  } else if (f === 'discord') {
-    discordDiv.style.display = 'block';
-    renderDiscordFeed();
-  } else if (f === 'community') {
-    if (commDiv) { commDiv.style.display = 'block'; renderCommunityManager(); }
-  } else if (f === 'qa') {
-    if (qaDiv) { qaDiv.style.display = 'block'; renderEngageQA(); }
-  } else {
-    feed.style.display = 'block';
-    renderEngageFeed();
-  }
-}
-
-function renderCommunityManager() {
-  const div = document.getElementById('communityManagerFeed');
-  if (!div) return;
-
-  const responseTemplates = [
-    {
-      trigger: 'Positive comment / compliment ("Love this!", "This is exactly what I need")',
-      tone: 'Warm, genuine, never sycophantic',
-      do: 'Acknowledge specifically what they said. Add one detail that shows you actually read it. Invite them deeper.',
-      dont: 'Don\'t say "Thanks so much!" without adding anything. Don\'t use exclamation points more than once.',
-      examples: [
-        { comment: '"This is literally me every Friday night"', reply: 'Every Friday, same chaos, different group chat. We built this for exactly that moment — link in bio when you\'re ready to end the spiral.' },
-        { comment: '"Finally an app that gets it"', reply: 'That\'s the whole goal — recs that feel like they came from someone who actually knows you. Waitlist\'s open if you want early access.' },
-      ]
-    },
-    {
-      trigger: 'Question about the product ("How does it work?", "Is it free?")',
-      tone: 'Confident, clear, human — not a FAQ bot',
-      do: 'Answer directly. One sentence max on the answer. Then give them the next step.',
-      dont: 'Don\'t explain the whole product in a comment. Don\'t link-dump. Don\'t say "great question!"',
-      examples: [
-        { comment: '"How is this different from Yelp?"', reply: 'Yelp shows you what\'s popular. We show you what\'s right for you. Big difference. Link in bio for early access.' },
-        { comment: '"Is this free?"', reply: 'Free. Always will be for the discovery side. Join the waitlist — link in bio.' },
-      ]
-    },
-    {
-      trigger: 'Skepticism / pushback ("This is just another app", "I\'ll believe it when I see it")',
-      tone: 'Unbothered, confident, never defensive',
-      do: 'Acknowledge the fair skepticism. Hold the position without over-explaining. Invite them to try.',
-      dont: 'Don\'t argue. Don\'t justify. Don\'t write a paragraph. One to two sentences max.',
-      examples: [
-        { comment: '"Every app says this and none of them deliver"', reply: 'Fair. We\'d rather earn that than argue it. Waitlist\'s open — come see.' },
-        { comment: '"Sounds like every other food app"', reply: 'Until it knows you, it\'s just an app. That\'s the whole problem we\'re solving. Link in bio.' },
-      ]
-    },
-    {
-      trigger: 'City / local request ("Do you cover [city]?")',
-      tone: 'Enthusiastic, specific, community-building',
-      do: 'Confirm or tease the city. Make them feel like their city matters specifically.',
-      dont: 'Don\'t give a generic "we cover everywhere!" answer. Don\'t over-promise.',
-      examples: [
-        { comment: '"Does this work in Austin?"', reply: 'Austin is one of our best cities right now. Join the waitlist and you\'ll be first when we go live there.' },
-        { comment: '"What about Chicago?"', reply: 'Deep dish, Italian beef, and approximately 0 bad opinions about food — Chicago\'s on the list. Waitlist open.' },
-      ]
-    },
-    {
-      trigger: 'Tag / mention ("Tagging my boyfriend who picks restaurants by Yelp")',
-      tone: 'Playful, inclusive, warm',
-      do: 'Lean into the bit. Make them both feel seen.',
-      dont: 'Don\'t be too salesy. This is a moment for personality, not a CTA.',
-      examples: [
-        { comment: '"Tagging @sarah who spends 45 mins on Yelp and still picks the same 3 places"', reply: '@sarah we built this for you. And also for your friends who are exhausted by the process.' },
-        { comment: '"My entire friend group needs this"', reply: 'Send them the link and take credit later. You\'re welcome.' },
-      ]
-    },
-    {
-      trigger: 'Feature request / idea ("You should add filters for dietary restrictions")',
-      tone: 'Engaged, appreciative, honest about timeline',
-      do: 'Show you heard the idea. Be real about where it sits. Make them feel like a builder.',
-      dont: 'Don\'t promise a timeline. Don\'t dismiss. Don\'t just say "great idea!"',
-      examples: [
-        { comment: '"Would love a vegan filter"', reply: 'Dietary preferences are part of your Taste Graph from the start — it\'s in there. Tell us what else you want to see when you join.' },
-        { comment: '"You should show wait times"', reply: 'On the list. The more people join and tell us what they need, the faster we build it. Waitlist link in bio.' },
-      ]
-    },
-  ];
-
-  const engagementStrategy = [
-    { rule: 'Reply within 2 hours during business hours', detail: 'The algorithm rewards early comment engagement. A reply in the first 2 hours signals to the platform that your content is worth distributing further.' },
-    { rule: 'Never reply with just an emoji', detail: 'Emoji-only replies read as automated and disengaged. Even "🙌" needs a word next to it to feel human.' },
-    { rule: 'Ask a follow-up question when the comment invites it', detail: 'Turn a comment into a thread. "Which city?" or "What\'s the craving?" extends the conversation and increases visible engagement count.' },
-    { rule: 'Pin the best comment on every post', detail: 'Pinning a great comment signals community and surfaces your best advocates. It also sets the tone for what kind of engagement you want.' },
-    { rule: 'Respond to criticism once, then stop', detail: 'One honest, unbothered response to pushback. Never a second one. Defending twice signals insecurity.' },
-    { rule: 'Feature commenters in content', detail: '"We asked our community — here\'s what they said" turns comments into content and makes followers feel like insiders.' },
-  ];
-
-  div.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <div style="font-size:15px;font-weight:700;margin-bottom:4px;">Community Manager Playbook</div>
-      <div style="font-size:12px;color:var(--muted);">How to respond authentically, build the comment section, and turn engagement into growth.</div>
-    </div>
-
-    <!-- ENGAGEMENT RULES -->
-    <div class="audit-card" style="margin-bottom:16px;">
-      <div class="audit-card-head">
-        <div class="audit-card-icon" style="background:rgba(0,209,145,0.1);">📐</div>
-        <div><div class="audit-card-title">6 Non-Negotiable Engagement Rules</div><div class="audit-card-sub">The floor for every comment, every platform</div></div>
-      </div>
-      <div class="audit-card-body">
-        ${engagementStrategy.map((r,i) => `
-          <div class="audit-finding">
-            <div class="audit-finding-dot" style="background:var(--green)"></div>
-            <div class="audit-finding-text"><strong style="font-weight:700;">${r.rule}</strong><span class="audit-quote">${r.detail}</span></div>
-          </div>`).join('')}
-      </div>
-    </div>
-
-    <!-- RESPONSE TEMPLATES -->
-    <div class="audit-card">
-      <div class="audit-card-head">
-        <div class="audit-card-icon" style="background:rgba(255,217,17,0.1);">💬</div>
-        <div><div class="audit-card-title">Response Templates by Comment Type</div><div class="audit-card-sub">Tone guide + real examples — adapt don't copy</div></div>
-      </div>
-      <div class="audit-card-body">
-        ${responseTemplates.map(t => `
-          <div style="padding:14px 0;border-bottom:1px solid var(--border);">
-            <div style="font-size:11px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--yellow);margin-bottom:6px;">${t.trigger}</div>
-            <div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
-              <div style="flex:1;min-width:180px;">
-                <div style="font-size:10.5px;font-weight:700;color:var(--green);margin-bottom:3px;">DO</div>
-                <div style="font-size:12px;color:var(--muted);">${t.do}</div>
-              </div>
-              <div style="flex:1;min-width:180px;">
-                <div style="font-size:10.5px;font-weight:700;color:var(--red);margin-bottom:3px;">DON'T</div>
-                <div style="font-size:12px;color:var(--muted);">${t.dont}</div>
-              </div>
-            </div>
-            ${t.examples.map(ex => `
-              <div style="background:var(--card2);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
-                <div style="font-size:11px;color:var(--muted2);margin-bottom:4px;">Comment: <em>"${ex.comment}"</em></div>
-                <div style="font-size:12.5px;font-weight:600;color:var(--green);">Reply: "${ex.reply}"</div>
-              </div>`).join('')}
-          </div>`).join('')}
-      </div>
-    </div>`;
-}
-
-function renderRedditFeed() {
-  const div = document.getElementById('redditFeed');
-  if (!div) return;
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div>
-        <div style="font-size:13px;font-weight:700;">Reddit Monitoring</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Watching r/FoodNYC · r/AskNYC · r/Austin · r/food · r/chicago — ${REDDIT_FEED.length} threads matched · Last scan: 6:00 PM</div>
-      </div>
-      <div style="display:flex;gap:6px;">
-        <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(255,69,0,0.1);color:#ff4500;border:1px solid rgba(255,69,0,0.25);">Reddit</span>
-        <button class="ocbtn" style="font-size:11px;" onclick="toast('Scanning Reddit…','#ff4500')">↻ Scan Now</button>
-      </div>
-    </div>
-    ${REDDIT_FEED.map(r => `
-      <div class="engage-card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(255,69,0,0.1);color:#ff4500;border:1px solid rgba(255,69,0,0.2);">${r.subreddit}</span>
-          <span style="font-size:11px;color:var(--muted2);">${r.author}</span>
-          <span style="font-size:10.5px;color:var(--muted2);">${r.time}</span>
-          <span style="font-size:10.5px;color:var(--muted2);">↑ ${r.upvotes} · ${r.comments} comments</span>
-        </div>
-        <div style="font-size:13.5px;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:10px;">${r.title}</div>
-        <div class="ec-reply-label">AI REPLY DRAFT</div>
-        <div class="ec-reply-draft">${r.aiReply}</div>
-        <div class="ec-actions">
-          <button class="ocbtn ocbtn-approve" style="font-size:11px;" onclick="toast('Reddit reply queued','#ff4500');this.closest('.engage-card').remove()">✓ Post Reply</button>
-          <button class="ocbtn" style="font-size:11px;" onclick="editInlineReply(this,'reddit')">✎ Edit</button>
-          <button class="ocbtn" style="font-size:11px;" onclick="this.closest('.engage-card').remove()">Dismiss</button>
-        </div>
-      </div>`).join('')}`;
-}
-
-function renderDiscordFeed() {
-  const div = document.getElementById('discordFeed');
-  if (!div) return;
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div>
-        <div style="font-size:13px;font-weight:700;">Discord Monitoring</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Watching: Eater NYC · NYC Food Lovers · Austin Food Community · SF Eats — ${DISCORD_FEED.length} messages matched</div>
-      </div>
-      <div style="display:flex;gap:6px;">
-        <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:rgba(88,101,242,0.1);color:#5865f2;border:1px solid rgba(88,101,242,0.25);">Discord</span>
-        <button class="ocbtn" style="font-size:11px;" onclick="toast('Scanning Discord…','#5865f2')">↻ Scan Now</button>
-      </div>
-    </div>
-    ${DISCORD_FEED.map(d => `
-      <div class="engage-card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(88,101,242,0.1);color:#5865f2;border:1px solid rgba(88,101,242,0.2);">${d.server}</span>
-          <span style="font-size:10.5px;color:var(--muted2);">${d.channel}</span>
-          <span style="font-size:11px;font-weight:600;color:var(--muted);">${d.user}</span>
-          <span style="font-size:10.5px;color:var(--muted2);">${d.time}</span>
-        </div>
-        <div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:10px;font-style:italic;">"${d.content}"</div>
-        <div class="ec-reply-label">AI REPLY DRAFT</div>
-        <div class="ec-reply-draft">${d.aiReply}</div>
-        <div class="ec-actions">
-          <button class="ocbtn ocbtn-approve" style="font-size:11px;" onclick="toast('Discord reply queued','#5865f2');this.closest('.engage-card').remove()">✓ Send Reply</button>
-          <button class="ocbtn" style="font-size:11px;" onclick="editInlineReply(this,'discord')">✎ Edit</button>
-          <button class="ocbtn" style="font-size:11px;" onclick="this.closest('.engage-card').remove()">Dismiss</button>
-        </div>
-      </div>`).join('')}`;
-}
-
-function renderFollowSuggestions() {
-  const div = document.getElementById('followSuggestions');
-  if (!div) return;
-  const cats = [...new Set(FOLLOW_SUGGESTIONS.map(s => s.category))];
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);">Suggested accounts to follow</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:2px;">Updated weekly · Based on food, restaurant discovery, and AI keywords · ${FOLLOW_SUGGESTIONS.length} accounts</div>
-      </div>
-      <button class="ocbtn" style="font-size:11px;" onclick="toast('Refreshing follow suggestions…')">↻ Refresh</button>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
-      ${cats.map(c => `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--card2);color:var(--muted);">${c}</span>`).join('')}
-    </div>
-    <div style="display:grid;gap:8px;">
-      ${FOLLOW_SUGGESTIONS.map(s => `
-        <div class="engage-card" style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
-              <span style="font-size:13px;font-weight:700;">${s.name}</span>
-              <span style="font-size:11.5px;color:var(--muted2);">${s.handle}</span>
-              <span style="font-size:9px;font-weight:700;letter-spacing:0.06em;padding:1px 6px;border-radius:4px;background:var(--card2);color:var(--muted);">${s.category}</span>
-            </div>
-            <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;font-style:italic;">"${s.bio}"</div>
-            <div style="font-size:11.5px;color:var(--green);display:flex;align-items:center;gap:5px;">
-              <span>✦</span> ${s.reason}
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
-            <span style="font-size:11px;color:var(--muted);">${s.followers}</span>
-            <button class="ocbtn ocbtn-approve" style="font-size:10px;padding:3px 10px;white-space:nowrap;" onclick="markFollowed('${s.handle}',this)">+ Follow</button>
-            <button class="ocbtn" style="font-size:10px;padding:3px 10px;" onclick="this.closest('.engage-card').remove()">Skip</button>
-          </div>
-        </div>`).join('')}
-    </div>`;
-}
-
-function markFollowed(handle, btn) {
-  btn.textContent = '✓ Following';
-  btn.style.background = 'rgba(0,209,145,0.15)';
-  btn.style.borderColor = 'rgba(0,209,145,0.4)';
-  btn.style.color = 'var(--green)';
-  btn.disabled = true;
-  toast(`Following ${handle}`, 'var(--green)');
-}
-
-function renderEngageFeed() {
-  const { on: ffOn, min: ffMin, max: ffMax } = getJaxFollowerFilter();
-  const items = ENGAGE_FEED.filter(e => {
-    if (engageFilter !== 'all' && e.type !== engageFilter) return false;
-    if (ffOn && e.followers) {
-      const fc = parseFollowerCount(e.followers);
-      if (fc < ffMin || fc > ffMax) return false;
-    }
-    return true;
-  });
-  const feed = document.getElementById('engageFeed');
-  if (!feed) return;
-  if (!items.length) { feed.innerHTML = '<div class="empty"><div class="empty-h">No matches</div><div class="empty-p">Try scanning again or adjusting your keyword list.</div></div>'; return; }
-  feed.innerHTML = items.map(e => `
-    <div class="engage-card" id="ec-${e.id}">
-      <div class="ec-top">
-        <div>
-          <div style="font-size:12.5px;font-weight:700;">${e.user} <span style="color:var(--muted2);font-weight:400;">${e.handle}</span></div>
-          <div style="font-size:11px;color:var(--muted2);">${e.followers} followers · ${e.time} · ${e.likes} likes</div>
-        </div>
-        <span class="sbadge" style="background:${e.type==='reply'?'rgba(255,40,31,0.14)':'rgba(0,209,145,0.14)'};color:${e.type==='reply'?'var(--red)':'var(--green)'};">${e.type==='reply'?'Reply Opp':'Retweet Opp'}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(0,0,0,0.08);color:var(--muted);border:1px solid var(--border2);">𝕏 Twitter</span></div>
-      <div class="ec-tweet">"${e.content}"</div>
-      ${e.aiReply ? `<div class="ec-reply-label">AI Draft Reply</div><div class="ec-reply-draft" id="erd-${e.id}">${e.aiReply}</div>` : ''}
-      <div class="ec-actions">
-        ${e.type==='reply' ? `
-          <button class="ocbtn ocbtn-approve" onclick="approveReply('${e.id}')">✓ Approve &amp; Send</button>
-          <button class="ocbtn" onclick="editReply('${e.id}')">Edit Reply</button>
-        ` : `
-          <button class="ocbtn ocbtn-approve" onclick="approveRetweet('${e.id}')">↺ Retweet</button>
-          <button class="ocbtn" onclick="approveRetweet('${e.id}',true)">↺ + Comment</button>
-        `}
-        <button class="ocbtn" onclick="dismissEngage('${e.id}')">✕ Skip</button>
-      </div>
-    </div>`).join('');
-}
-
-function showReply(id) {
-  const el = document.getElementById('erd-'+id);
-  if (!el) return;
-  el.style.display = el.style.display === 'block' ? 'none' : 'block';
-}
-
-function editReply(id) {
-  const draftEl = document.getElementById('erd-'+id);
-  const card = document.getElementById('ec-'+id);
-  if (!draftEl || !card) return;
-  const current = draftEl.textContent.trim();
-  draftEl.style.display = 'block';
-  draftEl.innerHTML = `<textarea class="ws-ta" style="font-size:12.5px;" rows="3">${current}</textarea>
-    <div style="display:flex;gap:5px;margin-top:6px;">
-      <button class="ocbtn ocbtn-approve" onclick="saveEditedReply('${id}',this)">✓ Save</button>
-      <button class="ocbtn" onclick="renderEngageFeed()">Cancel</button>
-    </div>`;
-}
-
-function saveEditedReply(id, btn) {
-  const ta = btn.closest('div').parentElement.querySelector('textarea');
-  if (!ta) return;
-  const newReply = ta.value;
-  const item = ENGAGE_FEED.find(e => e.id === id);
-  if (item) item.aiReply = newReply;
-  renderEngageFeed();
-  toast('Reply updated — approve to send', 'var(--red)');
-}
-
-function approveReply(id) {
-  const item = ENGAGE_FEED.find(e => e.id === id);
-  if (item) ENGAGE_FEED.splice(ENGAGE_FEED.indexOf(item), 1);
-  renderEngageFeed();
-  toast('Reply queued to send via Twitter', 'var(--red)');
-}
-
-function approveRetweet(id, withComment) {
-  const item = ENGAGE_FEED.find(e => e.id === id);
-  if (item) ENGAGE_FEED.splice(ENGAGE_FEED.indexOf(item), 1);
-  renderEngageFeed();
-  toast(withComment ? 'Retweet with comment queued' : 'Retweet queued', 'var(--green)');
-}
-
-function dismissEngage(id) {
-  const item = ENGAGE_FEED.find(e => e.id === id);
-  if (item) ENGAGE_FEED.splice(ENGAGE_FEED.indexOf(item), 1);
-  renderEngageFeed();
-}
-
-function approveAllReplies() {
-  ENGAGE_FEED.filter(e => e.type === 'reply').forEach(e => {
-    ENGAGE_FEED.splice(ENGAGE_FEED.indexOf(e), 1);
-  });
-  renderEngageFeed();
-  toast('All reply suggestions approved', 'var(--red)');
-}
-
-function editInlineReply(btn, platform) {
-  const card = btn.closest('.engage-card');
-  const draftEl = card.querySelector('.ec-reply-draft');
-  if (!draftEl) return;
-  const current = draftEl.innerText;
-  const approveColor = platform === 'reddit' ? '#ff4500' : platform === 'discord' ? '#5865f2' : 'var(--red)';
-  const approveLabel = platform === 'reddit' ? 'Post Reply' : platform === 'discord' ? 'Send Reply' : 'Approve & Send';
-  draftEl.innerHTML = `
-    <textarea class="ws-ta" style="font-size:12.5px;" rows="3">${current.replace(/</g,'&lt;')}</textarea>
-    <div style="display:flex;gap:5px;margin-top:6px;">
-      <button class="ocbtn ocbtn-approve" style="font-size:11px;" onclick="saveInlineReply(this,'${approveColor}')">✓ ${approveLabel}</button>
-      <button class="ocbtn" style="font-size:11px;" onclick="cancelInlineReply(this,'${current.replace(/'/g,"\\'")}')">Cancel</button>
-    </div>`;
-}
-
-function saveInlineReply(btn, color) {
-  const draftEl = btn.closest('.ec-reply-draft');
-  const ta = draftEl.querySelector('textarea');
-  const newText = ta ? ta.value : '';
-  draftEl.innerHTML = newText.replace(/\n/g,'<br>');
-  toast('Reply sent', color || 'var(--green)');
-  btn.closest('.engage-card').remove();
-}
-
-function cancelInlineReply(btn, original) {
-  const draftEl = btn.closest('.ec-reply-draft');
-  draftEl.innerHTML = original;
-}
+// JAX review queue: loads from Google Sheet CSV, wired to n8n
+// Dead old feed system removed — all data is real-time from sheet
 
 // ── JAX SCAN SCHEDULE ─────────────────────────────────────────────────────────
 function setEngageSchedule(mode, el) {
@@ -6664,33 +6240,11 @@ function checkEngageAutoScan() {
 }
 
 async function runEngageScan() {
-  const feed = document.getElementById('engageFeed');
-  if (!feed) return;
-  feed.innerHTML = `<div class="loading-wrap"><div class="spinner" style="border-top-color:var(--red)"></div><div class="ld-text">Scanning Twitter for keyword matches…</div><div class="ld-sub">Checking: food · restaurant · foodie · dining · AI food · where to eat</div><div class="prog"><div class="prog-bar" style="background:var(--red)" id="engageProg"></div></div></div>`;
-  animProg('engageProg', '', async () => {
-    const tweets = [
-      "where do i even start finding good restaurants in a new city, google maps is useless",
-      "every food app gives me the same 10 recommendations. there has to be something better",
-      "yelp ratings are meaningless at this point. how do people actually find good food",
-      "i wish there was an app that just knew my taste and gave me 3 good picks instead of 500",
-      "restaurant discovery is so broken. i spend more time picking where to eat than actually eating"
-    ];
-    const tweet = tweets[Math.floor(Math.random() * tweets.length)];
-    let aiReply = "New city, same taste. Stupid Good AI gives you 3 personalized picks wherever you land — no research spiral required. Free. Join the waitlist.";
-    try {
-      aiReply = await callClaude(
-        `You are Jax, social media engagement manager for Stupid Good AI. Write a short, human Twitter reply (under 60 words) to this tweet. Be helpful and genuine — not salesy. Mention Stupid Good AI naturally if it fits. Never start with "Great tweet" or similar.`,
-        `Tweet: "${tweet}"\n\nWrite a reply:`
-      );
-      aiReply = aiReply.trim();
-    } catch(e) { /* use fallback */ }
-    const id = 'e' + Date.now();
-    const handles = ['@urbanfoodie','@diningnerd','@tastehunter','@foodscout','@hungrylocal'];
-    const handle = handles[Math.floor(Math.random() * handles.length)];
-    ENGAGE_FEED.push({ id, type:'reply', user:handle, handle, followers: (Math.floor(Math.random()*9)+1)+'.'+(Math.floor(Math.random()*9))+'K', content:tweet, aiReply, time:'Just now', likes:Math.floor(Math.random()*50)+5 });
-    renderEngageFeed();
-    localStorage.setItem('jax_last_scan', String(Date.now())); updateNextScanLabel(localStorage.getItem('jax_schedule')||'3x'); toast('Scan complete — new match found', 'var(--red)');
-  });
+  // Refresh the real JAX review queue from Google Sheet
+  localStorage.setItem('jax_last_scan', String(Date.now()));
+  updateNextScanLabel(localStorage.getItem('jax_schedule') || '3x');
+  await loadJaxQueue();
+  toast('Queue refreshed from n8n', 'var(--red)');
 }
 
 // ── JAX FOLLOWER FILTER ───────────────────────────────────────────────────────
@@ -6711,7 +6265,6 @@ function getJaxFollowerFilter() {
 
 function applyJaxFollowerFilter() {
   loadJaxQueue();
-  renderEngageFeed();
 }
 
 function initJaxFollowerFilter() {
@@ -9120,30 +8673,12 @@ function runBloggerQA(targetId, prefilledText) {
   }, 900);
 }
 
-function renderEngageQA() {
-  const el = document.getElementById('engageQAFeed');
-  if (!el) return;
-  el.innerHTML = `<div class="input-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div>
-        <div class="ic-label" style="color:var(--red);margin-bottom:3px;">Engage QA Agent</div>
-        <div style="font-size:12px;color:var(--muted);">Checks replies for human tone, value, length, and brand voice before you post.</div>
-      </div>
-      <div style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:20px;background:rgba(255,40,31,0.1);color:var(--red);border:1px solid rgba(255,40,31,0.2);flex-shrink:0;">QA Agent</div>
-    </div>
-    <textarea class="ws-ta" id="engageQAInput" rows="4" placeholder="Paste a reply draft to review before posting…" style="border-color:rgba(255,40,31,0.2);"></textarea>
-    <div class="ic-footer">
-      <span class="ic-hint">6 checks · human tone · not too salesy · adds real value</span>
-      <button class="genbtn" style="background:var(--red);color:#fff;" onclick="runEngageQA()">Run QA Review →</button>
-    </div>
-  </div>
-  <div id="engageQAOutput"></div>`;
-}
+// renderEngageQA() removed — QA panel is now inline in engageView HTML (#jaxQAPanel)
 
 function runEngageQA() {
   const text = (document.getElementById('engageQAInput').value||'').trim();
-  if (!text) { toast('Paste a reply draft first'); return; }
-  const out = document.getElementById('engageQAOutput');
+  if (!text) { toast('Paste a reply draft first', 'var(--red)'); return; }
+  const out = document.getElementById('jaxQAOutput');
   out.innerHTML = '<div class="loading-wrap"><div class="spinner" style="border-top-color:var(--red)"></div><div class="ld-text">Checking reply quality…</div></div>';
   setTimeout(() => {
     const lower = text.toLowerCase();
@@ -9164,7 +8699,7 @@ function runEngageQA() {
     const warns=checks.filter(c=>c.status==='warn').length;
     const s=fails>0?'REWRITE':warns>1?'FIX':'PASS';
     const sc=fails>0?'var(--red)':warns>1?'var(--yellow)':'var(--green)';
-    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Reply QA · ${words} words · 6 checks`,sc,s,'← Back to Feed',`setEngageFilter('all',document.getElementById('ef-all'))`);
+    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Reply QA · ${words} words · 6 checks`,sc,s,'← Clear',`document.getElementById('engageQAInput').value='';document.getElementById('jaxQAOutput').innerHTML=''`);
   }, 800);
 }
 
