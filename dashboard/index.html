@@ -7922,17 +7922,45 @@ async function searchPexels(query) {
   const key = getPexelsKey();
   if (!key) return null;
   try {
-    const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5&orientation=portrait&size=medium`, {
-      headers: { Authorization: key }
-    });
+    // 1. Search for portrait clips
+    const r = await fetch(
+      `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=8&orientation=portrait&size=medium`,
+      { headers: { Authorization: key } }
+    );
     const data = await r.json();
     const video = data.videos?.[0];
     if (!video) return null;
-    // Get best portrait video file
-    const files = video.video_files || [];
-    const portrait = files.filter(f => f.height >= f.width).sort((a,b) => b.height - a.height);
-    return (portrait[0] || files[0])?.link || null;
-  } catch(e) { return null; }
+
+    // 2. Pick the smallest portrait file (SD preferred — faster download + upload)
+    const files = (video.video_files || []).filter(f => f.height >= f.width);
+    const ordered = files.sort((a,b) => (a.width*a.height) - (b.width*b.height));
+    const pick = ordered.find(f => f.quality === 'sd') || ordered[0];
+    if (!pick?.link) return null;
+
+    // 3. Fetch the video — Pexels requires Authorization header so Creatomate can't hit it directly
+    const vResp = await fetch(pick.link, { headers: { Authorization: key } });
+    if (!vResp.ok) return null;
+    const vBlob = await vResp.blob();
+
+    // 4. Upload to Supabase Storage → Creatomate gets a clean public URL
+    const fname = `broll-${video.id}-${Date.now()}.mp4`;
+    const up = await fetch(`${SB_URL}/storage/v1/object/post-images/${fname}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'video/mp4',
+        'x-upsert': 'true'
+      },
+      body: vBlob
+    });
+    if (!up.ok) { console.warn('[Pexels upload failed]', await up.text()); return null; }
+
+    return `${SB_URL}/storage/v1/object/public/post-images/${fname}`;
+  } catch(e) {
+    console.warn('[Pexels error]', e.message);
+    return null;
+  }
 }
 
 async function generateReelScript(brief, style, dur) {
@@ -8134,7 +8162,7 @@ async function generateReel() {
     const steps = [hasPexels ? 'B-roll' : null, hasVoice ? 'voiceover' : null].filter(Boolean);
     out.innerHTML = loadingHTML('purple',
       steps.length ? `Sourcing ${steps.join(' + ')}…` : 'Building reel…',
-      `${hasPexels ? 'Pexels search for each scene' : 'Text-only mode'} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'}`
+      `${hasPexels ? 'Downloading clips from Pexels → uploading to Supabase' : 'Text-only mode'} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'} · This takes ~30s`
     );
 
     const [videoUrls, voiceoverUrl] = await Promise.all([
