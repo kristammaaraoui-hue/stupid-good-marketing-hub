@@ -1423,7 +1423,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div class="rh-name">Rex</div>
         <div class="rh-lbl" style="color:var(--scout);margin-top:2px;">SCOUT · Intel Agent</div>
         <div class="rh-desc">Monitors competitors across Instagram, X, TikTok, newsletters, and web. Surfaces what's working — and your angle on it.</div>
-        <div class="rh-status" id="rexStatus"><div class="sdot-pulse" id="rexStatusDot" style="background:var(--scout);box-shadow:0 0 6px var(--scout)"></div><span style="color:var(--muted);font-size:11px;" id="rexStatusText">Ready</span></div>
       </div>
       <div style="padding:14px 14px 8px;">
         <div style="margin-top:0;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;">Monitoring</div>
@@ -1444,7 +1443,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
       <div class="ws-scroll">
         <!-- SCOUT TABS -->
         <div style="display:flex;gap:6px;margin-bottom:18px;">
-          <button class="chip" id="scout-tab-intel" onclick="setScoutTab('intel',this)" style="font-size:12px;padding:6px 14px;background:rgba(255,107,53,0.12);color:var(--scout);border-color:rgba(255,107,53,0.3);">Intel Feed</button>
+          <button class="chip" id="scout-tab-intel" onclick="setScoutTab('intel',this)" style="font-size:12px;padding:6px 14px;background:rgba(255,107,53,0.12);color:var(--scout);border-color:rgba(255,107,53,0.3);">Intel Feed<span id="scoutTabAge" style="font-size:9px;font-weight:600;color:var(--muted2);margin-left:5px;"></span></button>
           <button class="chip" id="scout-tab-campaign" onclick="setScoutTab('campaign',this)" style="font-size:12px;padding:6px 14px;">Monthly Campaign</button>
           <button class="chip" id="scout-tab-ideas" onclick="setScoutTab('ideas',this)" style="font-size:12px;padding:6px 14px;">Idea Bank</button>
         </div>
@@ -1469,10 +1468,6 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 Scan Now
               </button>
-            </div>
-            <div style="margin-top:14px;">
-              <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:8px;">Scan History</div>
-              <div id="scoutHistoryList"><div style="font-size:11px;color:var(--muted2);">No scans yet</div></div>
             </div>
           </div>
           <div class="ws-split-right">
@@ -7596,25 +7591,20 @@ function loadCampaignHistory(index) {
 }
 
 function setRexStatus(text, scanning) {
-  const dot = document.getElementById('rexStatusDot');
-  const txt = document.getElementById('rexStatusText');
-  if (dot) {
-    dot.style.background = scanning ? 'var(--yellow)' : 'var(--scout)';
-    dot.style.boxShadow = scanning ? '0 0 6px var(--yellow)' : '0 0 6px var(--scout)';
-  }
-  if (txt) txt.textContent = text;
+  // Status indicator removed — this is a no-op kept for call-site compatibility
+}
+
+function updateScoutTabAge(timestamp) {
+  const el = document.getElementById('scoutTabAge');
+  if (!el || !timestamp) return;
+  // Show short date from timestamp string e.g. "May 19, 2:30 PM" → "May 19"
+  const short = timestamp.split(',')[0] || timestamp;
+  el.textContent = '· ' + short;
 }
 
 function renderScoutHistoryPanel() {
-  const panel = document.getElementById('scoutHistoryList');
-  if (!panel) return;
-  const history = getScoutHistory();
-  if (!history.length) { panel.innerHTML = '<div style="font-size:11px;color:var(--muted2);">No scans yet</div>'; return; }
-  panel.innerHTML = history.map((h, i) => `
-    <div onclick="loadScoutScan(${i})" style="padding:6px 8px;border-radius:7px;cursor:pointer;border:1px solid ${i===0?'rgba(255,107,53,0.3)':'var(--border)'};background:${i===0?'rgba(255,107,53,0.06)':'transparent'};margin-bottom:4px;">
-      <div style="font-size:11px;font-weight:700;color:${i===0?'var(--scout)':'var(--text)'};">${h.timestamp}</div>
-      <div style="font-size:10px;color:var(--muted2);">${(h.data.intel||[]).length} competitors · ${(h.data.trends||[]).length} trends</div>
-    </div>`).join('');
+  // History is now shown in the rail via renderScoutRailHistory()
+  renderScoutRailHistory();
 }
 
 function loadScoutScan(index) {
@@ -7629,6 +7619,7 @@ function loadScoutScan(index) {
   const scannedEl = document.getElementById('scoutLastScannedText');
   if (scannedEl) scannedEl.textContent = `Showing: ${entry.timestamp} · ${(entry.data?.intel||[]).length} competitors`;
   setRexStatus('Scanned ' + entry.timestamp, false);
+  updateScoutTabAge(entry.timestamp);
 }
 
 function renderScoutIntelFromCache(parsed, label) {
@@ -7678,28 +7669,17 @@ function renderScoutIntel() {
     renderScoutIntelFromCache(latest.data, `Last scan: ${latest.timestamp}`);
     const scannedEl = document.getElementById('scoutLastScannedText');
     if (scannedEl) scannedEl.textContent = `Last scanned: ${latest.timestamp} · ${(latest.data.intel||[]).length} competitors`;
+    updateScoutTabAge(latest.timestamp);
     return;
   }
-  // Fall back to static SCOUT_INTEL data
+  // No scan history — show empty state, never show static placeholder data as live intel
   if (feed.innerHTML.trim()) return;
-  feed.innerHTML = SCOUT_INTEL.map((item, i) => `
-    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        ${platBadge(item.platform === 'newsletter' ? 'blog' : item.platform, 18)}
-        <span style="font-size:11px;font-weight:800;color:var(--scout);">${item.brand}</span>
-        <span style="font-size:10px;color:var(--muted2);">· ${item.type}</span>
-        <span style="font-size:10px;color:var(--muted2);margin-left:auto;">${item.date}</span>
-      </div>
-      <div style="font-size:12.5px;font-weight:700;color:var(--text);margin-bottom:5px;">${item.title}</div>
-      <div style="font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:10px;">${item.summary}</div>
-      <div style="padding:8px 10px;border-radius:8px;background:rgba(255,107,53,0.07);border:1px solid rgba(255,107,53,0.2);font-size:11px;color:var(--text);line-height:1.5;">
-        <span style="font-weight:700;color:var(--scout);">Our angle: </span>${item.angle}
-      </div>
-      <div style="display:flex;gap:6px;margin-top:10px;">
-        <button onclick="sendIntelToCopy(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(0,209,145,0.1);border:1px solid rgba(0,209,145,0.3);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;">→ Write with Sloane</button>
-        <button onclick="sendIntelToPenn(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(255,217,17,0.1);border:1px solid rgba(255,217,17,0.3);color:var(--yellow);font-size:11px;font-weight:700;cursor:pointer;">→ Send to Penn</button>
-      </div>
-    </div>`).join('');
+  feed.innerHTML = `<div style="padding:32px 20px;text-align:center;border:1px dashed var(--border);border-radius:14px;">
+    <div style="font-size:28px;margin-bottom:12px;opacity:0.5;">⚲</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">No scans yet</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;max-width:280px;margin-left:auto;margin-right:auto;">Hit <strong>Scan Now</strong> to pull live competitor activity from Yelp, Resy, OpenTable, Beli Eats, and Eater across Instagram, X, TikTok, and newsletters.</div>
+    <button onclick="runScoutScan()" style="padding:8px 20px;border-radius:9px;background:var(--scout);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;">Run First Scan →</button>
+  </div>`;
 }
 
 function renderScoutIdeas() {
@@ -7778,6 +7758,9 @@ Return the JSON as specified in your instructions.`
     const scannedEl = document.getElementById('scoutLastScannedText');
     if (scannedEl) scannedEl.textContent = `Last scanned: ${window.scoutLastScan} · ${intel.length} competitors · ${trends.length} trends`;
     setRexStatus('Scanned ' + window.scoutLastScan, false);
+    updateScoutTabAge(window.scoutLastScan);
+    // Refresh Ideas tab if it's currently open
+    if (document.getElementById('scoutTabIdeas')?.style.display !== 'none') renderScoutIdeas();
   } catch(e) {
     feed.innerHTML = `<div style="color:var(--red);font-size:13px;padding:16px;">${e.message}</div>`;
     toast('Scout scan failed: ' + e.message, 'var(--red)');
@@ -7894,8 +7877,26 @@ function sendCampaignToAgents(btn) {
   const pixelBrief = document.getElementById('pixelBrief');
   if (pixelBrief) pixelBrief.value = `${scoutMonth} campaign: ${c.theme || ''} — ${c.tagline || ''}`;
 
+  // Inject Jax keywords from campaign (theme words + Jax agent tasks)
+  const jaxAgent = (c.agents || []).find(a => a.name === 'Jax');
+  if (jaxAgent || c.theme) {
+    const source = [(c.theme || ''), (c.tagline || ''), (jaxAgent?.tasks || '')].join(' ');
+    // Extract meaningful phrases: words 4+ chars, skip common stopwords
+    const stop = new Set(['that','this','with','from','have','will','your','their','they','what','when','where','which','about','into','than','then','been','were','also','more','very','just','like','make','each','some','only','over','such','much','both','here','well','need','most','these','those','after','other','would','could','should']);
+    const candidates = [...new Set(
+      source.toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/)
+        .filter(w => w.length >= 4 && !stop.has(w))
+    )].slice(0, 4);
+    if (candidates.length) {
+      const kws = getJaxKeywords();
+      let added = 0;
+      candidates.forEach(kw => { if (!kws.includes(kw)) { kws.push(kw); added++; } });
+      if (added) { saveJaxKeywords(kws); renderJaxKeywords(); }
+    }
+  }
+
   if (btn) { btn.textContent = '✓ Brief sent to all agents'; btn.style.background = 'var(--green)'; }
-  toast('Campaign brief sent to Sloane · Penn · Nova — briefs pre-filled', 'var(--scout)');
+  toast('Campaign brief sent to Sloane · Penn · Nova · Jax — all agents briefed', 'var(--scout)');
 }
 
 function sendIdeaToCopy(i) {
@@ -8430,13 +8431,10 @@ renderCopyEmptyState();
 initSettingsPlatChips();
 renderEngageScanHistory();
 renderScoutRailHistory();
-// Restore Rex status from last scan
+// Restore Intel Feed tab age from last scan
 (function() {
   const h = getScoutHistory();
-  if (h.length) {
-    const txt = document.getElementById('rexStatusText');
-    if (txt) txt.textContent = 'Scanned ' + h[0].timestamp;
-  }
+  if (h.length) updateScoutTabAge(h[0].timestamp);
 })();
 
 // ── BLOG PREVIEW ─────────────────────────────────────────────────────────────
