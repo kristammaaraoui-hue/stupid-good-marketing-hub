@@ -1184,15 +1184,33 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <span class="scale-label">Template</span>
             <select id="pixelTemplateSelect" onchange="setPixelTemplate(this.value)" style="width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--text);font-size:12px;cursor:pointer;outline:none;">
               <option value="auto">Auto — Nova picks best fit</option>
-              <option value="DAHI_nPH0aQ">Restaurant Call Out — Style 1</option>
-              <option value="DAHI_mCB3ss">Restaurant Call Out — Style 2</option>
-              <option value="DAHI_qe2TME">Restaurant Call Out — Style 3</option>
-              <option value="DAHI_t5xq5U">Restaurant Call Out — Style 4</option>
-              <option value="DAHI_mrrsag">Menu Item Call Out</option>
-              <option value="DAHI_szSaio">Multiple Locations — Style 1</option>
-              <option value="DAHI_tuoKgE">Multiple Locations — Style 2</option>
-              <option value="DAHI_gGWC7w">Multiple Locations List</option>
-              <option value="DAHI_r7B0tk">Question or Opinion</option>
+              <optgroup label="── Restaurant Spotlights">
+                <option value="DAHI_nPH0aQ">Restaurant Call Out — Style 1</option>
+                <option value="DAHI_mCB3ss">Restaurant Call Out — Style 2</option>
+                <option value="DAHI_qe2TME">Restaurant Call Out — Style 3</option>
+                <option value="DAHI_t5xq5U">Restaurant Call Out — Style 4</option>
+                <option value="DAHI_mrrsag">Menu Item Call Out</option>
+              </optgroup>
+              <optgroup label="── Multiple Locations">
+                <option value="DAHI_szSaio">Multiple Locations — Style 1</option>
+                <option value="DAHI_tuoKgE">Multiple Locations — Style 2</option>
+                <option value="DAHI_gGWC7w">Multiple Locations List</option>
+              </optgroup>
+              <optgroup label="── Brand Messaging">
+                <option value="DAHKDA7Q-KU">Chat Bubble Post</option>
+                <option value="DAHHB0jgAdU">Life's Too Short For Pretty Good</option>
+                <option value="DAHKB79erag">You Use 4 Apps (3-slide)</option>
+                <option value="DAHKB-_smKo">The Spotify of Dining</option>
+              </optgroup>
+              <optgroup label="── Carousels">
+                <option value="DAHKBy69xYQ">4 Apps Carousel (9 slides)</option>
+              </optgroup>
+              <optgroup label="── Stories / Reels">
+                <option value="DAHKB3PiLKQ">Story Sequence (5 frames)</option>
+                <option value="DAHKB0B945Q">Story: How Long Did It Take?</option>
+                <option value="DAHKB2Lj3KA">Story: You Use 4 Apps</option>
+                <option value="DAHKB_6RtCM">Reels Cover Thumbnails</option>
+              </optgroup>
             </select>
           </div>
           <!-- ASSETS -->
@@ -3978,22 +3996,26 @@ BRAND SPECS:
 
 DO NOT TOUCH: Canva design DAHHfvrbXwk ("Finished Posts - Do Not Touch") is strictly off-limits. Never read, edit, duplicate, or reference this design unless the user explicitly grants permission in the current session.
 
-AVAILABLE CANVA TEMPLATES (Social Media only) — you must select one by canva_template_id:
+AVAILABLE CANVA TEMPLATES — you MUST select one by canva_template_id. NEVER set canva_template_id to null unless the user explicitly chose "Nova's choice" mode.
+
+── RESTAURANT SPOTLIGHTS (use when post features a specific restaurant or dish) ──
 
 1. "Restaurant Call Out - Style 1" — ID: DAHI_nPH0aQ
-   Use for: single restaurant spotlight with photo background, city badge, dish + restaurant name
+   Use for: single restaurant spotlight, full-bleed photo background, city badge overlay
 
-2. "Restaurant Call out - Style 2" — ID: DAHI_mCB3ss
-   Use for: restaurant feature with alternate layout/photo framing style
+2. "Restaurant Call Out - Style 2" — ID: DAHI_mCB3ss
+   Use for: restaurant feature with alternate photo framing/layout style
 
-3. "Restaurant Call out - Style 3" — ID: DAHI_qe2TME
-   Use for: clean single-restaurant callout, editorial feel
+3. "Restaurant Call Out - Style 3" — ID: DAHI_qe2TME
+   Use for: clean single-restaurant callout, editorial/magazine feel
 
-4. "Restaurant Call out - Style 4" — ID: DAHI_t5xq5U
+4. "Restaurant Call Out - Style 4" — ID: DAHI_t5xq5U
    Use for: bold restaurant callout, high-contrast treatment
 
-5. "Menu item call out" — ID: DAHI_mrrsag
+5. "Menu Item Call Out" — ID: DAHI_mrrsag
    Use for: spotlighting a specific dish or menu item at a restaurant
+
+── MULTIPLE LOCATIONS (use when post features 2+ restaurants) ──
 
 6. "Multiple Location Call Out - Style 1" — ID: DAHI_szSaio
    Use for: two or more restaurant/location callouts in one post, style 1
@@ -4004,8 +4026,38 @@ AVAILABLE CANVA TEMPLATES (Social Media only) — you must select one by canva_t
 8. "Multiple Locations List" — ID: DAHI_gGWC7w
    Use for: ranked or curated list of restaurants/spots (3+), list format
 
-9. "Question or Opinion" — ID: DAHI_r7B0tk
-   Use for: debate posts, hot takes, engagement questions, community prompts
+── BRAND MESSAGING (use for brand awareness, opinions, positioning, and app marketing posts) ──
+
+9. "Restaurant Chat Bubble" — ID: DAHKDA7Q-KU
+   Use for: conversational chat-style posts about restaurant picks, word-of-mouth feel
+
+10. "Life's Too Short For Pretty Good" — ID: DAHHB0jgAdU
+    Use for: brand statement posts, aspirational messaging, "upgrade your dining" angle (18-page design — reference first page for the primary image)
+
+11. "You Use 4 Apps To Pick A Restaurant" — ID: DAHKB79erag
+    Use for: pain-point posts about the problem Stupid Good solves, app overload, decision fatigue (3-page post)
+
+12. "The Spotify of Dining" — ID: DAHKB-_smKo
+    Use for: app positioning, category comparison, "personalized discovery" angle
+
+── CAROUSELS (use when post tells a story across multiple slides) ──
+
+13. "4 Apps Carousel (9 slides)" — ID: DAHKBy69xYQ
+    Use for: multi-step storytelling, problem-solution journeys, educational carousel content
+
+── STORIES & REELS COVERS (use for Story or Reel formats — 9:16 vertical) ──
+
+14. "Story Sequence (5 frames)" — ID: DAHKB3PiLKQ
+    Use for: multi-frame Instagram/TikTok story sequences, sequential storytelling
+
+15. "Story: How Long Did It Take You To Pick?" — ID: DAHKB0B945Q
+    Use for: engagement stories, poll-style content, relatable decision-fatigue moments
+
+16. "Story: You Use 4 Apps" — ID: DAHKB2Lj3KA
+    Use for: brand story content, pain-point stories, app awareness
+
+17. "Reels Cover Thumbnails" — ID: DAHKB_6RtCM
+    Use for: TikTok/Reel cover thumbnail designs, video thumbnail graphics
 
 PHOTO RULES:
 - If the post calls out a specific restaurant or dish at a named location → specify photos from that actual restaurant (note this in the brief so the user knows to source them)
@@ -4067,58 +4119,101 @@ Return ONLY a JSON array of 4 design brief objects. Each object must have: "head
 }
 
 function novaTemplateMockup(templateId, headline, subtext, mood) {
+  const logo = `<div style="position:absolute;bottom:10px;right:10px;width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>`;
+  const hl = (headline||'').slice(0,30);
+  const sub = (subtext||'').slice(0,40);
+
   // Restaurant call out styles (full-bleed photo bg with text overlay)
-  const photoOverlay = ['DAHI_nPH0aQ','DAHI_mCB3ss','DAHI_qe2TME','DAHI_t5xq5U','DAHI_mrrsag'];
-  // Multiple locations
-  const multiLoc = ['DAHI_szSaio','DAHI_tuoKgE'];
-  // List
-  const listStyle = ['DAHI_gGWC7w'];
-  // Opinion / white card
-  const opinion = ['DAHI_r7B0tk'];
-
-  const hl = (headline||'').slice(0,28);
-  const sub = (subtext||'').slice(0,36);
-
-  if (photoOverlay.includes(templateId)) {
+  if (['DAHI_nPH0aQ','DAHI_mCB3ss','DAHI_qe2TME','DAHI_t5xq5U','DAHI_mrrsag'].includes(templateId)) {
     const isMenuItem = templateId === 'DAHI_mrrsag';
-    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a1208,#2a1a0a,#0d1a0d);display:flex;flex-direction:column;justify-content:flex-end;padding:14px;min-height:160px;">
-      <div style="position:absolute;inset:0;background:url('') center/cover;opacity:0.18;"></div>
-      ${isMenuItem ? `<div style="position:absolute;top:14px;left:14px;right:14px;background:rgba(255,255,255,0.07);border-radius:6px;height:70px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,0.3);">[ dish photo ]</div>` : ''}
-      <div style="position:relative;">
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a1208,#2a1a0a,#0d1a0d);display:flex;flex-direction:column;justify-content:flex-end;padding:14px;min-height:160px;position:relative;">
+      ${isMenuItem ? `<div style="position:absolute;top:14px;left:14px;right:14px;background:rgba(255,255,255,0.07);border-radius:6px;height:60px;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,0.3);">[ dish photo ]</div>` : ''}
+      <div style="position:relative;z-index:1;">
         <div style="display:inline-block;border:1px solid rgba(255,255,255,0.5);padding:2px 7px;font-size:8px;font-weight:700;color:rgba(255,255,255,0.7);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:5px;">CITY</div>
         <div style="font-size:13px;font-weight:900;color:#fff;line-height:1.2;margin-bottom:3px;">${hl}</div>
         ${sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.6);">${sub}</div>` : ''}
       </div>
-      <div style="position:absolute;bottom:10px;right:10px;width:16px;height:16px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+      ${logo}
     </div>`;
   }
-  if (multiLoc.includes(templateId)) {
-    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:7px;min-height:160px;">
-      ${[1,2].map(n => `<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;background:rgba(255,255,255,0.08);border-radius:4px;flex-shrink:0;"></div><div><div style="font-size:9px;font-weight:700;color:#fff;opacity:${n===1?1:0.6};">${n===1?hl:'Location '+n}</div><div style="font-size:8px;color:rgba(255,255,255,0.4);">City · Neighborhood</div></div></div>`).join('')}
-      <div style="position:absolute;bottom:10px;right:10px;width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+
+  // Multiple locations
+  if (['DAHI_szSaio','DAHI_tuoKgE'].includes(templateId)) {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:7px;min-height:160px;position:relative;">
+      ${[1,2].map(n=>`<div style="background:rgba(255,255,255,0.06);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;"><div style="width:28px;height:28px;background:rgba(255,255,255,0.08);border-radius:4px;flex-shrink:0;"></div><div><div style="font-size:9px;font-weight:700;color:#fff;opacity:${n===1?1:0.6};">${n===1?hl:'Location 2'}</div><div style="font-size:8px;color:rgba(255,255,255,0.4);">City · Neighborhood</div></div></div>`).join('')}
+      ${logo}
     </div>`;
   }
-  if (listStyle.includes(templateId)) {
-    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:5px;min-height:160px;">
+
+  // Multiple locations list
+  if (templateId === 'DAHI_gGWC7w') {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0d1520,#1a2535);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:5px;min-height:160px;position:relative;">
       <div style="font-size:10px;font-weight:800;color:#00d191;margin-bottom:4px;">${hl}</div>
       ${[1,2,3].map(n=>`<div style="display:flex;align-items:center;gap:7px;"><div style="width:16px;height:16px;border-radius:50%;background:${n===1?'#f254fd':n===2?'#00d191':'rgba(255,255,255,0.15)'};display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:800;color:#000;flex-shrink:0;">${n}</div><div style="height:6px;background:rgba(255,255,255,${n===1?'0.4':n===2?'0.25':'0.12'});border-radius:3px;flex:1;"></div></div>`).join('')}
-      <div style="position:absolute;bottom:10px;right:10px;width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;gap:1px;"><div style="background:#f254fd;border-radius:1px;"></div><div style="background:#00d191;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div><div style="background:#393939;border-radius:1px;"></div></div>
+      ${logo}
     </div>`;
   }
-  if (opinion.includes(templateId)) {
-    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a1a2e,#16213e);display:flex;align-items:center;justify-content:center;padding:14px;min-height:160px;">
-      <div style="background:#fff;border-radius:10px;padding:14px;width:100%;text-align:center;">
-        <div style="font-size:11px;font-weight:900;color:#393939;line-height:1.3;margin-bottom:8px;">${hl}</div>
-        <div style="height:40px;background:#f0f0f0;border-radius:6px;margin-bottom:8px;"></div>
-        ${sub ? `<div style="font-size:8px;color:#888;">${sub}</div>` : ''}
+
+  // Chat bubble post
+  if (templateId === 'DAHKDA7Q-KU') {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#1a0a2e,#0d1a1e);display:flex;flex-direction:column;justify-content:center;padding:14px;gap:8px;min-height:160px;position:relative;">
+      <div style="background:#f254fd;border-radius:12px 12px 12px 2px;padding:8px 12px;max-width:80%;"><div style="font-size:9.5px;font-weight:700;color:#fff;line-height:1.3;">${hl}</div></div>
+      ${sub ? `<div style="background:rgba(255,255,255,0.08);border-radius:12px 12px 2px 12px;padding:7px 10px;max-width:70%;align-self:flex-end;"><div style="font-size:8.5px;color:rgba(255,255,255,0.7);">${sub}</div></div>` : ''}
+      ${logo}
+    </div>`;
+  }
+
+  // Brand statement posts (Life's Too Short, 4 Apps, Spotify of Dining)
+  if (['DAHHB0jgAdU','DAHKB79erag','DAHKB-_smKo'].includes(templateId)) {
+    const accent = templateId === 'DAHHB0jgAdU' ? '#f254fd' : templateId === 'DAHKB-_smKo' ? '#00d191' : '#fff';
+    return `<div style="width:100%;height:100%;background:#0a0a0a;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:16px;min-height:160px;position:relative;">
+      <div style="width:24px;height:3px;background:${accent};border-radius:2px;margin-bottom:10px;"></div>
+      <div style="font-size:12px;font-weight:900;color:#fff;line-height:1.25;margin-bottom:6px;">${hl}</div>
+      ${sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.5);line-height:1.4;">${sub}</div>` : ''}
+      <div style="position:absolute;top:12px;right:12px;font-size:8px;color:${accent};font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">Brand Post</div>
+      ${logo}
+    </div>`;
+  }
+
+  // Carousel
+  if (templateId === 'DAHKBy69xYQ') {
+    return `<div style="width:100%;height:100%;background:linear-gradient(160deg,#0a0a0a,#1a0a2e);display:flex;flex-direction:column;justify-content:center;padding:14px;min-height:160px;position:relative;">
+      <div style="font-size:8px;font-weight:700;color:#f254fd;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Carousel · 9 slides</div>
+      <div style="font-size:12px;font-weight:900;color:#fff;line-height:1.25;margin-bottom:8px;">${hl}</div>
+      <div style="display:flex;gap:3px;">${[1,2,3,4].map(n=>`<div style="height:3px;border-radius:2px;flex:1;background:${n===1?'#f254fd':'rgba(255,255,255,0.2)'};"></div>`).join('')}</div>
+      ${logo}
+    </div>`;
+  }
+
+  // Story / vertical formats
+  if (['DAHKB3PiLKQ','DAHKB0B945Q','DAHKB2Lj3KA'].includes(templateId)) {
+    const label = templateId === 'DAHKB3PiLKQ' ? 'Story Sequence' : 'Story';
+    return `<div style="width:100%;height:100%;background:linear-gradient(180deg,#0a0a0a,#1a0030);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;text-align:center;min-height:160px;position:relative;">
+      <div style="font-size:8px;font-weight:700;color:#f254fd;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">${label}</div>
+      <div style="font-size:11px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:6px;">${hl}</div>
+      ${sub ? `<div style="font-size:8.5px;color:rgba(255,255,255,0.5);">${sub}</div>` : ''}
+      ${logo}
+    </div>`;
+  }
+
+  // Reels cover thumbnails
+  if (templateId === 'DAHKB_6RtCM') {
+    return `<div style="width:100%;height:100%;background:linear-gradient(180deg,#0a0a0a,#001a10);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:14px;min-height:160px;position:relative;">
+      <div style="position:absolute;top:0;left:0;right:0;height:60%;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,0.3);">[ reel thumbnail ]</div>
+      <div style="width:100%;text-align:center;">
+        <div style="font-size:8px;font-weight:700;color:#00d191;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Reel Cover</div>
+        <div style="font-size:11px;font-weight:900;color:#fff;line-height:1.2;">${hl}</div>
       </div>
+      ${logo}
     </div>`;
   }
+
   // Nova's choice / fallback
-  return `<div style="width:100%;height:100%;background:linear-gradient(135deg,#1a0a2e,#2a0a3e);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:6px;min-height:160px;">
+  return `<div style="width:100%;height:100%;background:linear-gradient(135deg,#1a0a2e,#2a0a3e);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:6px;min-height:160px;position:relative;">
     <div style="font-size:13px;font-weight:900;color:#f254fd;line-height:1.2;">${hl}</div>
     ${sub ? `<div style="font-size:9px;color:rgba(255,255,255,0.5);">${sub}</div>` : ''}
     <div style="font-size:8px;color:rgba(255,255,255,0.3);margin-top:4px;">Nova's choice</div>
+    ${logo}
   </div>`;
 }
 
@@ -4131,18 +4226,23 @@ function createCanvaDesign(idx) {
     'Blog Header': '1200×630', 'Blog Banner': '1600×500'
   };
   const size = sizeMap[railState.ps] || railState.ps;
+  const templateUrl = d.canva_template_id ? `https://www.canva.com/design/${d.canva_template_id}/edit` : null;
 
   window._novaBrief = [
-    `Create a ${railState.ps} (${size}) in Canva using the StupidGood brand kit (ID: kAHG8RvIyVQ).`,
-    d.canva_template_id ? `Base template: "${d.template_name}" (Canva design ID: ${d.canva_template_id}) — edit this design, do not create from scratch.` : `Design style: Nova's choice — create from scratch using only brand colors (#f254fd, #00d191, #393939, #ffffff) and fonts (Foun for headlines, Open Sauce for body). No template required.`,
+    `Nova Canva brief — use copy-design then perform-editing-operations.`,
+    `Template ID: ${d.canva_template_id || 'none (free-form)'}`,
+    `Template name: ${d.template_name || 'Nova\'s choice'}`,
+    `Format: ${railState.ps} (${size})`,
+    `Brand kit: kAHG8RvIyVQ`,
+    ``,
     `Headline: "${d.headline}"`,
     d.subtext ? `Subtext: "${d.subtext}"` : null,
     `Layout: ${d.layout}`,
     `Color scheme: ${d.colorScheme}`,
     `Photo: ${d.photoNote}`,
     `Mood: ${d.mood}`,
-    railState.bgImages?.length ? `Background photos (${railState.bgImages.length} uploaded): ${railState.bgImages.map(f=>f.name).join(', ')} — use these as background images; replace any stock photo in the template.` : null,
-    railState.logoImage ? `Restaurant logo: "${railState.logoImage.name}" — user has uploaded this file; place it in the design instead of or alongside the brand logo.` : null
+    railState.bgImages?.length ? `Uploaded background photos (${railState.bgImages.length}): ${railState.bgImages.map(f=>f.name).join(', ')}` : null,
+    railState.logoImage ? `Uploaded restaurant logo: "${railState.logoImage.name}"` : null
   ].filter(Boolean).join('\n');
 
   const existing = document.getElementById('novaModal');
@@ -4152,7 +4252,7 @@ function createCanvaDesign(idx) {
   overlay.className = 'bpm-overlay active';
   overlay.id = 'novaModal';
   overlay.innerHTML = `
-    <div class="bpm-panel" style="max-width:500px;">
+    <div class="bpm-panel" style="max-width:520px;">
       <div class="bpm-nav">
         <div style="display:flex;align-items:center;gap:10px;">
           <div style="width:32px;height:32px;border-radius:8px;overflow:hidden;flex-shrink:0;">
@@ -4160,56 +4260,70 @@ function createCanvaDesign(idx) {
           </div>
           <div>
             <div style="font-size:13px;font-weight:800;color:var(--purple);">Nova → Canva</div>
-            <div style="font-size:11px;color:var(--muted);">Design brief ready</div>
+            <div style="font-size:11px;color:var(--muted);">${d.template_name || 'Nova\'s choice'}</div>
           </div>
         </div>
         <button class="ocbtn" onclick="document.getElementById('novaModal').remove()">✕ Close</button>
       </div>
       <div style="padding:24px;">
 
-        <div style="background:var(--card2);border:1px solid rgba(242,84,253,0.2);border-radius:12px;padding:16px;margin-bottom:16px;">
-          <div style="font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--purple);margin-bottom:12px;">Design Brief</div>
-          <div style="display:flex;flex-direction:column;gap:9px;">
-            <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Headline</span>
-              <span style="font-size:13px;font-weight:700;color:var(--text);">"${d.headline}"</span>
+        <!-- Copy-ready text fields -->
+        <div style="background:var(--card2);border:1px solid rgba(242,84,253,0.2);border-radius:12px;padding:16px;margin-bottom:14px;">
+          <div style="font-size:9.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--purple);margin-bottom:12px;">Text To Copy Into Canva</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+
+            <!-- Headline row -->
+            <div>
+              <div style="font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Headline</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:13px;font-weight:700;color:var(--text);line-height:1.3;">${d.headline}</div>
+                <button class="ocbtn" style="flex-shrink:0;font-size:11px;white-space:nowrap;" onclick="navigator.clipboard.writeText('${d.headline.replace(/'/g,"\\'")}').then(()=>{this.textContent='✓ Copied';setTimeout(()=>{this.innerHTML='Copy'},1500)})">Copy</button>
+              </div>
             </div>
-            ${d.subtext ? `<div style="display:flex;gap:10px;"><span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Subtext</span><span style="font-size:12px;color:var(--text);">"${d.subtext}"</span></div>` : ''}
-            <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Format</span>
-              <span style="font-size:12px;color:var(--text);">${railState.ps} · ${size}</span>
+
+            <!-- Subtext row -->
+            ${d.subtext ? `<div>
+              <div style="font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Subtext</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div style="flex:1;background:var(--card);border:1px solid var(--border2);border-radius:7px;padding:9px 12px;font-size:12.5px;color:var(--text);line-height:1.3;">${d.subtext}</div>
+                <button class="ocbtn" style="flex-shrink:0;font-size:11px;white-space:nowrap;" onclick="navigator.clipboard.writeText('${d.subtext.replace(/'/g,"\\'")}').then(()=>{this.textContent='✓ Copied';setTimeout(()=>{this.innerHTML='Copy'},1500)})">Copy</button>
+              </div>
+            </div>` : ''}
+
+            <!-- Photo note -->
+            <div style="display:flex;gap:10px;padding-top:4px;border-top:1px solid var(--border);">
+              <span style="font-size:10px;font-weight:700;color:var(--muted);width:72px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Photo</span>
+              <span style="font-size:11.5px;color:var(--text);line-height:1.5;">${d.photoNote}</span>
             </div>
             <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Layout</span>
-              <span style="font-size:12px;color:var(--text);">${d.layout}</span>
+              <span style="font-size:10px;font-weight:700;color:var(--muted);width:72px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Colors</span>
+              <span style="font-size:11.5px;color:var(--text);line-height:1.5;">${d.colorScheme}</span>
             </div>
             <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Colors</span>
-              <span style="font-size:12px;color:var(--text);">${d.colorScheme}</span>
-            </div>
-            <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Mood</span>
-              <span style="font-size:12px;color:var(--text);">${d.mood}</span>
-            </div>
-            <div style="display:flex;gap:10px;">
-              <span style="font-size:10px;font-weight:700;color:var(--muted);width:78px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Brand Kit</span>
-              <span style="font-size:12px;color:var(--green);">StupidGood · kAHG8RvIyVQ</span>
+              <span style="font-size:10px;font-weight:700;color:var(--muted);width:72px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.06em;padding-top:2px;">Mood</span>
+              <span style="font-size:11.5px;color:var(--text);">${d.mood}</span>
             </div>
           </div>
         </div>
 
-        <div style="background:rgba(242,84,253,0.05);border:1px solid rgba(242,84,253,0.18);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;">
-          <div style="font-size:20px;line-height:1;flex-shrink:0;color:var(--purple);">⬡</div>
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--purple);margin-bottom:3px;">How this works</div>
-            <div style="font-size:11.5px;color:var(--muted);line-height:1.6;">Copy the brief and paste it in the Claude Code chat. Nova will generate the design in your Canva account with the StupidGood brand kit applied — multiple options to choose from.</div>
-          </div>
+        <!-- Two action buttons -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          ${templateUrl ? `<a href="${templateUrl}" target="_blank" rel="noopener" style="text-decoration:none;">
+            <button class="genbtn" style="width:100%;justify-content:center;background:rgba(242,84,253,0.12);color:var(--purple);border:1px solid rgba(242,84,253,0.3);">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Open in Canva
+            </button>
+          </a>` : `<div></div>`}
+          <button class="genbtn gb-purple" style="width:100%;justify-content:center;" id="novaCopyBtn" onclick="copyNovaBrief(this)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Ask Claude to Build
+          </button>
         </div>
 
-        <button class="genbtn gb-purple" style="width:100%;justify-content:center;" id="novaCopyBtn" onclick="copyNovaBrief(this)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy Brief for Claude
-        </button>
+        <div style="font-size:10.5px;color:var(--muted2);text-align:center;line-height:1.5;">
+          <strong style="color:var(--muted);">Open in Canva</strong> → opens the template directly · <strong style="color:var(--muted);">Ask Claude</strong> → copies a brief you paste in chat and I'll build it via MCP
+        </div>
+
       </div>
     </div>`;
 
