@@ -4376,7 +4376,9 @@ async function repurposeBlog(title) {
     return;
   }
   const rpPrefix = 'rp' + Date.now();
-  const scoutTip = SCOUT_INTEL[Math.floor(Math.random()*SCOUT_INTEL.length)];
+  // Scout tip — only show if live scan data exists
+  const liveIntel = window.scoutIntelCache?.intel || [];
+  const scoutTip = liveIntel.length ? liveIntel[Math.floor(Math.random()*liveIntel.length)] : null;
   sec.innerHTML = `
     <div class="repurpose-section">
       <!-- Pipeline header -->
@@ -4393,10 +4395,8 @@ async function repurposeBlog(title) {
         <span style="font-size:10px;color:var(--muted);margin-left:4px;">Blog → Social · ${reposts.length} posts generated</span>
         <button class="ocbtn ocbtn-approve" style="margin-left:auto;font-size:11px;" onclick="approveAllRepurpose()">+ Add All to Queue</button>
       </div>
-      <!-- Scout intel -->
-      <div style="padding:8px 12px;border-radius:8px;background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);margin-bottom:12px;font-size:11px;color:var(--muted);line-height:1.4;">
-        <span style="font-weight:800;color:var(--scout);">⚑ Scout: </span>${scoutTip.brand} recently ran "${scoutTip.title}" — ${scoutTip.angle}
-      </div>
+      <!-- Scout intel (only shown when live scan data exists) -->
+      ${scoutTip ? `<div style="padding:8px 12px;border-radius:8px;background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);margin-bottom:12px;font-size:11px;color:var(--muted);line-height:1.4;"><span style="font-weight:800;color:var(--scout);">⚑ Scout: </span>${scoutTip.brand} recently ran "${scoutTip.title}" — ${scoutTip.angle}</div>` : ''}
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
         <button class="rbtn on" onclick="filterRepurpose('all',this)" style="font-size:11px;padding:4px 10px;">All</button>
         <button class="rbtn" onclick="filterRepurpose('x',this)" style="font-size:11px;padding:4px 10px;">X</button>
@@ -7706,12 +7706,18 @@ function renderScoutIdeas() {
       window.scoutIntelCache = latest.data;
       window.scoutLastScan = latest.timestamp;
     } else {
-      ideas = SCOUT_IDEAS;
-      ideaLabel = null;
+      // No scan data — show empty state, never show static ideas
+      feed.innerHTML = `<div style="padding:32px 20px;text-align:center;border:1px dashed var(--border);border-radius:14px;">
+        <div style="font-size:28px;margin-bottom:12px;opacity:0.5;">💡</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">No ideas yet</div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;max-width:280px;margin-left:auto;margin-right:auto;">Run a scan first — Rex will generate content ideas based on live competitor activity.</div>
+        <button onclick="setScoutTab('intel');runScoutScan()" style="padding:8px 20px;border-radius:9px;background:var(--scout);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;">Run First Scan →</button>
+      </div>`;
+      return;
     }
   }
-  const isLive = !!ideaLabel;
-  feed.innerHTML = (isLive ? `<div style="font-size:10.5px;color:var(--scout);font-weight:700;margin-bottom:10px;">IDEAS · from ${ideaLabel}</div>` : '') +
+  const isLive = true; // always live data at this point
+  feed.innerHTML = `<div style="font-size:10.5px;color:var(--scout);font-weight:700;margin-bottom:10px;">IDEAS · from ${ideaLabel}</div>` +
   ideas.map((item,i) => `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -7723,8 +7729,8 @@ function renderScoutIdeas() {
         <span style="font-weight:700;">Steal it: </span>${item.steal}
       </div>
       <div style="display:flex;gap:6px;">
-        <button onclick="${isLive ? 'sendLiveIdeaToCopy' : 'sendIdeaToCopy'}(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(0,209,145,0.1);border:1px solid rgba(0,209,145,0.3);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;">→ Send to Sloane</button>
-        <button onclick="${isLive ? 'sendLiveIdeaToPenn' : 'sendIdeaToPenn'}(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(255,217,17,0.1);border:1px solid rgba(255,217,17,0.3);color:var(--yellow);font-size:11px;font-weight:700;cursor:pointer;">→ Send to Penn</button>
+        <button onclick="sendLiveIdeaToCopy(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(0,209,145,0.1);border:1px solid rgba(0,209,145,0.3);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;">→ Send to Sloane</button>
+        <button onclick="sendLiveIdeaToPenn(${i})" style="padding:5px 12px;border-radius:7px;background:rgba(255,217,17,0.1);border:1px solid rgba(255,217,17,0.3);color:var(--yellow);font-size:11px;font-weight:700;cursor:pointer;">→ Send to Penn</button>
       </div>
     </div>`).join('');
 }
@@ -7946,21 +7952,9 @@ function sendLiveIdeaToPenn(i) {
     toast('Live idea sent to Penn — brief pre-filled', 'var(--yellow)');
   }, 300);
 }
-// Intel Feed → Sloane/Penn (static SCOUT_INTEL)
-function sendIntelToCopy(i) {
-  const item = SCOUT_INTEL[i];
-  if (!item) return;
-  const brief = `Intel brief from ${item.brand} (${item.platform}):\n\nWhat they did: ${item.title}\n${item.summary}\n\nOur angle: ${item.angle}\n\nWrite a post using this angle.`;
-  goAgent('copy');
-  setTimeout(() => { const el = document.getElementById('copyBrief'); if (el) el.value = brief; toast('Intel sent to Sloane — brief pre-filled', 'var(--green)'); }, 300);
-}
-function sendIntelToPenn(i) {
-  const item = SCOUT_INTEL[i];
-  if (!item) return;
-  const brief = `Intel from ${item.brand}: ${item.title}\n\n${item.summary}\n\nOur angle: ${item.angle}`;
-  goAgent('draft');
-  setTimeout(() => { const el = document.getElementById('draftBrief'); if (el) el.value = brief; toast('Intel sent to Penn — brief pre-filled', 'var(--yellow)'); }, 300);
-}
+// Intel Feed → Sloane/Penn (always uses live cache)
+function sendIntelToCopy(i) { sendLiveIntelToCopy(i); }
+function sendIntelToPenn(i) { sendLiveIntelToPenn(i); }
 // Intel Feed → Sloane/Penn (live scan results)
 function sendLiveIntelToCopy(i) {
   const intel = window.scoutIntelCache?.intel || [];
