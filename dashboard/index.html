@@ -160,6 +160,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
 .scale-label { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; flex-shrink:0; }
 .scale-chips { display:flex; gap:5px; flex-wrap:wrap; flex:1; }
 .sc { padding:4px 11px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--border2); color:var(--muted); background:transparent; transition:all 0.15s; }
+.sc.selected-p { background:rgba(242,84,253,0.14); color:var(--purple); border-color:rgba(242,84,253,0.35); }
 .sc:hover { color:var(--text); border-color:#555; }
 .sc.on { background:rgba(0,209,145,0.14); color:var(--green); border-color:rgba(0,209,145,0.35); }
 .custom-count { width:72px; padding:4px 8px; border-radius:6px; border:1px solid var(--border2); background:var(--card2); color:var(--text); font-size:12px; font-family:inherit; outline:none; display:none; }
@@ -1148,6 +1149,13 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
     </div>
     <div class="ws-main">
       <div class="ws-scroll">
+
+        <!-- Nova tab nav -->
+        <div style="display:flex;gap:6px;padding:0 0 14px;border-bottom:1px solid var(--border);margin-bottom:0;flex-shrink:0;">
+          <div class="chip on-p" id="nova-tab-designs" onclick="setPixelTab('designs',this)">🎨 Designs</div>
+          <div class="chip" id="nova-tab-reels" onclick="setPixelTab('reels',this)">🎬 Reels</div>
+        </div>
+
         <div id="pixelTabMain" class="ws-split">
         <div class="ws-split-left">
         <div id="pixelPrefill" style="display:none;background:rgba(242,84,253,0.08);border:1px solid rgba(242,84,253,0.25);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12.5px;color:var(--purple);align-items:center;gap:8px;">
@@ -1259,6 +1267,59 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         </div><!-- end ws-split-right -->
         </div><!-- end pixelTabMain -->
 
+        <!-- ══ REELS TAB ══ -->
+        <div id="pixelTabReels" class="ws-split" style="display:none;">
+          <div class="ws-split-left">
+            <div class="input-card">
+              <div class="ic-label">Reel Brief</div>
+              <textarea class="ws-ta focus-p" id="reelBrief" rows="3" placeholder="Describe the reel — e.g. 'why people waste 45 mins picking a restaurant' or 'Stupid Good vs 4 apps'"></textarea>
+
+              <div class="scale-row" style="margin-bottom:8px;margin-top:10px;">
+                <span class="scale-label">Reel Style</span>
+              </div>
+              <div class="scale-chips" id="reelStyleChips">
+                <div class="sc selected-p" id="rs-pain" onclick="setReelStyle('pain',this)">Pain Point</div>
+                <div class="sc" id="rs-claim" onclick="setReelStyle('claim',this)">Bold Claim</div>
+                <div class="sc" id="rs-lifestyle" onclick="setReelStyle('lifestyle',this)">Lifestyle</div>
+                <div class="sc" id="rs-comparison" onclick="setReelStyle('comparison',this)">Text Comparison</div>
+              </div>
+
+              <div class="scale-row" style="margin-bottom:8px;margin-top:8px;">
+                <span class="scale-label">Duration</span>
+              </div>
+              <div class="scale-chips" id="reelDurChips">
+                <div class="sc selected-p" id="rd-15" onclick="setReelDur('15',this)">~15s</div>
+                <div class="sc" id="rd-30" onclick="setReelDur('30',this)">~30s</div>
+                <div class="sc" id="rd-60" onclick="setReelDur('60',this)">~60s</div>
+              </div>
+
+              <div class="scale-row" style="margin-bottom:8px;margin-top:8px;">
+                <span class="scale-label">B-Roll</span>
+              </div>
+              <div class="scale-chips">
+                <div class="sc selected-p" id="rb-pexels" onclick="setReelBroll('pexels',this)">Auto from Pexels</div>
+                <div class="sc" id="rb-text" onclick="setReelBroll('text',this)">Text Only</div>
+              </div>
+
+              <div class="ic-footer" style="margin-top:14px;">
+                <span class="ic-hint" id="reelHint">Pain Point · ~15s · Auto B-roll</span>
+                <button class="genbtn gb-purple" onclick="generateReel()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Generate Reel
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="ws-split-right">
+            <div id="reelOutput">
+              <div class="empty">
+                <div class="empty-ico" style="color:var(--purple)">🎬</div>
+                <div class="empty-h">Reel Engine ready</div>
+                <div class="empty-p">Describe your reel, pick a style, and hit Generate. I'll write the script, pull B-roll, and render a full 9:16 MP4 — ready to post.</div>
+              </div>
+            </div>
+          </div>
+        </div><!-- end pixelTabReels -->
 
       </div>
     </div>
@@ -1837,6 +1898,42 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
             <button onclick="toggleGsheetsKeyVisibility()" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;" id="gsheetsKeyToggleBtn">Show</button>
           </div>
           <div id="gsheetsKeyStatus" style="font-size:11px;margin-top:8px;color:var(--muted);"></div>
+        </div>
+
+        <!-- Reel Engine Keys -->
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);">
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--purple);margin-bottom:10px;">Reel Engine</div>
+        </div>
+        <div class="settings-card">
+          <div style="margin-bottom:12px;">
+            <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">Creatomate API Key <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(242,84,253,0.1);color:var(--purple);border:1px solid rgba(242,84,253,0.2);">REELS</span></div>
+            <div class="settings-card-sub">Required for Nova's Reel Engine · creatomate.com → Sign in → Project Settings → API Key</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="password" id="creatomateKeyInput" class="settings-input" style="flex:1;" placeholder="Creatomate API key…" oninput="localStorage.setItem('sg_creatomate_key',this.value.trim());updateCreatomateStatus()">
+            <button onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.textContent=this.previousElementSibling.type==='password'?'Show':'Hide'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;">Show</button>
+          </div>
+          <div id="creatomateStatus" style="font-size:11px;margin-top:8px;color:var(--muted);"></div>
+        </div>
+        <div class="settings-card" style="margin-top:10px;">
+          <div style="margin-bottom:12px;">
+            <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">Pexels API Key <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(242,84,253,0.1);color:var(--purple);border:1px solid rgba(242,84,253,0.2);">REELS</span></div>
+            <div class="settings-card-sub">Free stock video B-roll for reels · pexels.com/api → one-click approval · completely free</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="password" id="pexelsKeyInput" class="settings-input" style="flex:1;" placeholder="Pexels API key…" oninput="localStorage.setItem('sg_pexels_key',this.value.trim())">
+            <button onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.textContent=this.previousElementSibling.type==='password'?'Show':'Hide'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;">Show</button>
+          </div>
+        </div>
+        <div class="settings-card" style="margin-top:10px;">
+          <div style="margin-bottom:12px;">
+            <div class="settings-card-title" style="display:flex;align-items:center;gap:8px;">ElevenLabs API Key <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;background:rgba(242,84,253,0.1);color:var(--purple);border:1px solid rgba(242,84,253,0.2);">REELS</span></div>
+            <div class="settings-card-sub">AI voiceover for reels — optional · elevenlabs.io → Sign in → Profile → API Key · free tier available</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="password" id="elevenLabsKeyInput" class="settings-input" style="flex:1;" placeholder="ElevenLabs API key…" oninput="localStorage.setItem('sg_elevenlabs_key',this.value.trim())">
+            <button onclick="this.previousElementSibling.type=this.previousElementSibling.type==='password'?'text':'password';this.textContent=this.previousElementSibling.type==='password'?'Show':'Hide'" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;cursor:pointer;">Show</button>
+          </div>
         </div>
       </div>
 
@@ -2787,6 +2884,19 @@ function showBlotatoSyncBanner(count) {
   if (ginp && gkey) { ginp.value = gkey; }
   const gs = document.getElementById('gsheetsKeyStatus');
   if (gs && gkey) gs.innerHTML = '<span style="color:var(--green)">✓ Key saved</span>';
+
+  // Reel Engine keys
+  const ckey = localStorage.getItem('sg_creatomate_key') || '';
+  const cinp = document.getElementById('creatomateKeyInput');
+  if (cinp && ckey) { cinp.value = ckey; }
+  const cs = document.getElementById('creatomateStatus');
+  if (cs && ckey) { cs.innerHTML = '<span style="color:var(--green)">✓ Key saved</span>'; }
+  const pkey = localStorage.getItem('sg_pexels_key') || '';
+  const pinp = document.getElementById('pexelsKeyInput');
+  if (pinp && pkey) { pinp.value = pkey; }
+  const elkey = localStorage.getItem('sg_elevenlabs_key') || '';
+  const elinp = document.getElementById('elevenLabsKeyInput');
+  if (elinp && elkey) { elinp.value = elkey; }
 
   // Pre-populate n8n URL and show connection status
   if (!localStorage.getItem('sg_n8n_url')) {
@@ -7678,12 +7788,386 @@ const QA_STACKED_NEG  = ["not bad","not terrible","not the worst","isn't the wor
 const QA_CORP_SPEAK   = ['utilize','leverage','bandwidth','circle back','deep dive','move the needle','best-in-class','state-of-the-art'];
 
 function setPixelTab(tab, el) {
-  const isQA = tab === 'qa';
-  document.getElementById('pixelTabMain').style.display = isQA ? 'none' : 'flex';
-  document.getElementById('pixelTabQA').style.display   = isQA ? 'block' : 'none';
-  if (isQA) renderGraphicQA();
+  const isReels = tab === 'reels';
+  const isMain  = tab === 'designs' || (!isReels);
+  document.getElementById('pixelTabMain').style.display  = isMain   ? 'flex'  : 'none';
+  document.getElementById('pixelTabReels').style.display = isReels  ? 'flex'  : 'none';
+  // legacy QA tab (may not exist in DOM — guard)
+  const qaEl = document.getElementById('pixelTabQA');
+  if (qaEl) qaEl.style.display = 'none';
   document.querySelectorAll('#pixelView .ws-scroll > div:first-child .chip').forEach(c => c.classList.remove('on-p'));
-  el.classList.add('on-p');
+  if (el) el.classList.add('on-p');
+}
+
+// ── REEL ENGINE ───────────────────────────────────────────────────────────────
+
+function getCreatomateKey() { return localStorage.getItem('sg_creatomate_key') || ''; }
+function getPexelsKey()     { return localStorage.getItem('sg_pexels_key') || ''; }
+function getElevenLabsKey() { return localStorage.getItem('sg_elevenlabs_key') || ''; }
+
+let reelState = { style: 'pain', dur: '15', broll: 'pexels' };
+
+function setReelStyle(s, el) {
+  reelState.style = s;
+  document.querySelectorAll('#reelStyleChips .sc').forEach(c => c.classList.remove('selected-p'));
+  el.classList.add('selected-p');
+  updateReelHint();
+}
+function setReelDur(d, el) {
+  reelState.dur = d;
+  document.querySelectorAll('#reelDurChips .sc').forEach(c => c.classList.remove('selected-p'));
+  el.classList.add('selected-p');
+  updateReelHint();
+}
+function setReelBroll(b, el) {
+  reelState.broll = b;
+  document.querySelectorAll('#pixelTabReels .scale-chips:nth-of-type(3) .sc, #pixelTabReels .scale-chips:last-of-type .sc').forEach(c => c.classList.remove('selected-p'));
+  document.querySelectorAll('#pixelTabReels .sc').forEach(c => { if(c.id===`rb-${b}`) c.classList.add('selected-p'); });
+  updateReelHint();
+}
+function updateReelHint() {
+  const labels = { pain:'Pain Point', claim:'Bold Claim', lifestyle:'Lifestyle', comparison:'Text Comparison' };
+  const bLabel = reelState.broll === 'text' ? 'Text-only' : 'Pexels B-roll';
+  const el = document.getElementById('reelHint');
+  if (el) el.textContent = `${labels[reelState.style] || reelState.style} · ~${reelState.dur}s · ${bLabel}`;
+}
+
+function updateCreatomateStatus() {
+  const k = getCreatomateKey();
+  const el = document.getElementById('creatomateStatus');
+  if (!el) return;
+  el.textContent = k ? '✓ Key saved' : '';
+  el.style.color = k ? 'var(--green)' : 'var(--muted)';
+}
+
+async function searchPexels(query) {
+  const key = getPexelsKey();
+  if (!key) return null;
+  try {
+    const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=5&orientation=portrait&size=medium`, {
+      headers: { Authorization: key }
+    });
+    const data = await r.json();
+    const video = data.videos?.[0];
+    if (!video) return null;
+    // Get best portrait video file
+    const files = video.video_files || [];
+    const portrait = files.filter(f => f.height >= f.width).sort((a,b) => b.height - a.height);
+    return (portrait[0] || files[0])?.link || null;
+  } catch(e) { return null; }
+}
+
+async function generateReelScript(brief, style, dur) {
+  const stylePrompts = {
+    pain: `Format: Pain Point reel. Structure: Scene 1 = hook (relatable problem statement). Scene 2 = amplify the pain (make it worse). Scene 3 = the pivot (hint at solution). Scene 4 = solution reveal + CTA. Each scene 3-5 words — punchy, no fluff.`,
+    claim: `Format: Bold Claim reel. Structure: Scene 1 = bold attention-grabbing claim. Scene 2 = back it up in one sentence. Scene 3 = what makes it true. Scene 4 = CTA. Short and punchy.`,
+    lifestyle: `Format: Lifestyle reel. Structure: Scene 1 = aspirational mood/vibe statement. Scene 2 = what the experience feels like. Scene 3 = brand connection. Scene 4 = soft CTA. Poetic, not salesy.`,
+    comparison: `Format: Text Comparison reel. Structure: Scene 1 = "Before" state (the old way). Scene 2 = the contrast moment. Scene 3 = "After" state (the Stupid Good way). Scene 4 = CTA. Clean, minimal text.`
+  };
+  const numScenes = dur === '60' ? 6 : dur === '30' ? 5 : 4;
+  const sceneDur  = dur === '60' ? 10 : dur === '30' ? 6 : 4;
+
+  const REEL_SYSTEM = `You are a TikTok/Reels scriptwriter for Stupid Good AI — a personalized restaurant discovery app. Brand: sharp, funny, conversational. Colors: #f254fd (pink), #00d191 (green). Tagline: "Life's too short for pretty good." The app solves decision fatigue — no more using 4 apps to pick a restaurant.`;
+  const prompt = `Write a ${numScenes}-scene reel script for this brief: "${brief}"
+
+${stylePrompts[style] || stylePrompts.pain}
+
+Rules:
+- Each scene text = 4-8 words MAX (it's a video — viewers skim)
+- Scene 1 MUST stop the scroll — bold, surprising, or relatable
+- Last scene always ends with a download CTA
+- Pexels search query = 3-5 words that describe ideal B-roll footage for that scene (food, dining, phone, people, etc.)
+
+Return ONLY a JSON array with exactly ${numScenes} objects:
+[{"text":"scene text here","subtext":"optional small supporting text or empty string","pexels_query":"3-5 word search term","duration":${sceneDur},"accent_color":"#f254fd or #00d191 or #ffffff"}]`;
+
+  const raw = await callClaude(REEL_SYSTEM, prompt);
+  const match = raw.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error('Script parse failed: ' + raw.slice(0,200));
+  return JSON.parse(match[0]);
+}
+
+function buildReelSource(scenes, videoUrls, style) {
+  const useBroll = reelState.broll === 'pexels' && videoUrls.some(v => v);
+  const bgColors = { pain:'#0a0a14', claim:'#0a0a0a', lifestyle:'#0d1a0d', comparison:'#0a0a0a' };
+  const bgColor = bgColors[style] || '#0a0a0a';
+
+  const source = {
+    output_format: 'mp4',
+    width: 1080,
+    height: 1920,
+    frame_rate: 30,
+    fill_color: bgColor,
+    snapshot_time: scenes[0]?.duration ? scenes[0].duration * 0.4 : 1.5,
+    elements: [
+      // Background music (subtle, 30% volume)
+      {
+        type: 'audio',
+        source: 'https://creatomate-static.s3.amazonaws.com/demo/pixabay-best-summer-128473.mp3',
+        duration: null,
+        audio_fade_out: 2,
+        volume: '25%'
+      }
+    ]
+  };
+
+  scenes.forEach((scene, i) => {
+    const videoUrl = videoUrls[i];
+    const accentColor = scene.accent_color || (i === 0 ? '#f254fd' : i === scenes.length-1 ? '#00d191' : '#ffffff');
+    const isLast = i === scenes.length - 1;
+
+    const composition = {
+      type: 'composition',
+      track: 1,
+      duration: scene.duration || 4,
+      elements: []
+    };
+
+    // Add transition (not on first scene)
+    if (i > 0) {
+      composition.transition = { type: 'fade', duration: 0.3 };
+    }
+
+    // B-roll video background
+    if (useBroll && videoUrl) {
+      composition.elements.push({
+        type: 'video',
+        source: videoUrl,
+        volume: '0%',
+        fit: 'cover',
+        duration: null
+      });
+    }
+
+    // Brand accent bar (top)
+    composition.elements.push({
+      type: 'text',
+      text: '',
+      x: '0%',
+      y: '0%',
+      width: '100%',
+      height: '0.5%',
+      x_anchor: '0%',
+      y_anchor: '0%',
+      background_color: accentColor,
+      fill_color: 'rgba(0,0,0,0)'
+    });
+
+    // Main headline text
+    const textEl = {
+      type: 'text',
+      text: scene.text,
+      x: '50%',
+      y: useBroll && videoUrl ? '72%' : '47%',
+      width: '85%',
+      height: '45%',
+      x_alignment: '50%',
+      y_alignment: '50%',
+      font_family: 'Montserrat',
+      font_weight: '900',
+      font_size: scene.text.length > 30 ? '7.5 vmin' : '9 vmin',
+      fill_color: '#ffffff',
+      stroke_color: useBroll && videoUrl ? '#000000' : 'rgba(0,0,0,0)',
+      stroke_width: '0.7 vmin',
+      line_height: '110%',
+      animations: [
+        {
+          time: 'start',
+          duration: 0.45,
+          easing: 'back-out',
+          type: 'slide',
+          direction: 'up',
+          distance: '20%'
+        }
+      ]
+    };
+    composition.elements.push(textEl);
+
+    // Subtext
+    if (scene.subtext) {
+      composition.elements.push({
+        type: 'text',
+        text: scene.subtext,
+        x: '50%',
+        y: useBroll && videoUrl ? '85%' : '67%',
+        width: '80%',
+        x_alignment: '50%',
+        y_alignment: '50%',
+        font_family: 'Montserrat',
+        font_weight: '500',
+        font_size: '4.5 vmin',
+        fill_color: accentColor,
+        animations: [{ time: 0.25, duration: 0.4, easing: 'quadratic-out', type: 'fade' }]
+      });
+    }
+
+    // CTA scene: add brand logo grid + app name
+    if (isLast) {
+      composition.elements.push({
+        type: 'text',
+        text: 'Stupid Good AI',
+        x: '50%',
+        y: '92%',
+        width: '80%',
+        x_alignment: '50%',
+        y_alignment: '50%',
+        font_family: 'Montserrat',
+        font_weight: '700',
+        font_size: '3.5 vmin',
+        fill_color: 'rgba(255,255,255,0.5)',
+        animations: [{ time: 0.4, duration: 0.5, easing: 'quadratic-out', type: 'fade' }]
+      });
+    }
+
+    source.elements.push(composition);
+  });
+
+  return source;
+}
+
+async function generateReel() {
+  const ck = getCreatomateKey();
+  if (!ck) {
+    toast('Add your Creatomate API key in Settings first', 'var(--red)');
+    goAgent('settings');
+    return;
+  }
+  const brief = document.getElementById('reelBrief').value.trim();
+  if (!brief) {
+    toast('Describe the reel first', 'var(--red)');
+    document.getElementById('reelBrief').focus();
+    return;
+  }
+
+  const out = document.getElementById('reelOutput');
+  out.innerHTML = loadingHTML('purple', 'Writing reel script…', 'Calling Claude AI · Building scene-by-scene script');
+
+  try {
+    // 1. Generate script
+    const scenes = await generateReelScript(brief, reelState.style, reelState.dur);
+    if (!scenes?.length) throw new Error('No scenes generated');
+
+    // 2. Fetch Pexels B-roll
+    out.innerHTML = loadingHTML('purple', 'Sourcing B-roll…', `Searching Pexels for ${scenes.length} scenes · portrait video clips`);
+    const videoUrls = reelState.broll === 'pexels'
+      ? await Promise.all(scenes.map(s => searchPexels(s.pexels_query)))
+      : scenes.map(() => null);
+
+    // 3. Build Creatomate source
+    const source = buildReelSource(scenes, videoUrls, reelState.style);
+
+    // 4. Submit render
+    out.innerHTML = loadingHTML('purple', 'Rendering reel…', 'Creatomate is building your MP4 · Usually takes 30–60 seconds');
+    const renderResp = await fetch('https://api.creatomate.com/v1/renders', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${ck}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, render_scale: 1.0 })
+    });
+    if (!renderResp.ok) {
+      const err = await renderResp.json();
+      throw new Error(err.message || err.hint || 'Creatomate render failed');
+    }
+    const renders = await renderResp.json();
+    const renderId = renders[0]?.id;
+    if (!renderId) throw new Error('No render ID returned');
+
+    // 5. Poll for completion
+    await pollReelRender(renderId, ck, scenes, brief);
+
+  } catch(e) {
+    out.innerHTML = `<div style="padding:20px;color:var(--red);font-size:13px;">⚠ ${e.message}</div>`;
+  }
+}
+
+async function pollReelRender(renderId, ck, scenes, brief) {
+  const out = document.getElementById('reelOutput');
+  const maxAttempts = 40;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const resp = await fetch(`https://api.creatomate.com/v1/renders/${renderId}`, {
+        headers: { Authorization: `Bearer ${ck}` }
+      });
+      const render = await resp.json();
+      if (render.status === 'succeeded') {
+        showReelResult(render, scenes, brief);
+        return;
+      }
+      if (render.status === 'failed') {
+        throw new Error(render.error_message || 'Render failed');
+      }
+      // Update progress message
+      const elapsed = (i + 1) * 3;
+      out.innerHTML = loadingHTML('purple', `Rendering reel… (${elapsed}s)`, `Status: ${render.status} · Usually takes 30–60 seconds · Don't close this tab`);
+    } catch(e) {
+      if (e.message !== 'Render failed') continue; // network hiccup - keep polling
+      throw e;
+    }
+  }
+  throw new Error('Render timed out after 2 minutes');
+}
+
+function showReelResult(render, scenes, brief) {
+  const out = document.getElementById('reelOutput');
+  const totalDur = scenes.reduce((s, sc) => s + (sc.duration || 4), 0);
+  const thumb = render.snapshot_url || '';
+
+  // Save to reel history
+  const hist = JSON.parse(localStorage.getItem('sg_reel_history') || '[]');
+  hist.unshift({ brief, url: render.url, ts: Date.now(), dur: totalDur, id: render.id });
+  if (hist.length > 20) hist.length = 20;
+  localStorage.setItem('sg_reel_history', JSON.stringify(hist));
+
+  out.innerHTML = `
+    <div style="animation:fadeUp 0.3s ease;">
+      <div class="out-header">
+        <div class="out-title">Reel ready</div>
+        <div class="out-meta">${scenes.length} scenes · ${totalDur}s · 1080×1920 MP4</div>
+      </div>
+
+      <!-- Video preview -->
+      <div style="background:#000;border-radius:14px;overflow:hidden;margin-bottom:14px;position:relative;aspect-ratio:9/16;max-height:480px;">
+        <video controls playsinline style="width:100%;height:100%;object-fit:contain;display:block;" src="${render.url}" poster="${thumb}">
+          Your browser doesn't support video.
+        </video>
+      </div>
+
+      <!-- Scene breakdown -->
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--purple);margin-bottom:8px;">Scene Breakdown</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          ${scenes.map((s, i) => `
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted2);width:20px;flex-shrink:0;padding-top:1px;">${i+1}</div>
+              <div style="font-size:12px;font-weight:600;color:var(--text);flex:1;">${s.text}</div>
+              <div style="font-size:10px;color:var(--muted2);flex-shrink:0;">${s.duration}s</div>
+            </div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <a href="${render.url}" download="stupidgood-reel.mp4" style="text-decoration:none;">
+          <button class="genbtn gb-purple" style="width:100%;justify-content:center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download MP4
+          </button>
+        </a>
+        <button class="genbtn" style="width:100%;justify-content:center;background:rgba(0,209,145,0.1);color:var(--green);border:1px solid rgba(0,209,145,0.3);" onclick="scheduleReelToBlotato('${render.url}','${brief.replace(/'/g,"\\'")}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Schedule to Blotato
+        </button>
+      </div>
+    </div>`;
+  toast('Reel rendered — download or schedule it', 'var(--purple)');
+}
+
+async function scheduleReelToBlotato(videoUrl, caption) {
+  const bkey = getBlotatoKey();
+  if (!bkey) { toast('Add Blotato key in Settings to schedule', 'var(--red)'); return; }
+  toast('Opening Blotato schedule…', 'var(--green)');
+  // Opens Blotato — direct video URL scheduling to be wired when Blotato video endpoint confirmed
+  window.open('https://blotato.com', '_blank');
 }
 
 function setDraftTab(tab, el) {
