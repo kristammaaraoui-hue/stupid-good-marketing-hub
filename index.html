@@ -3596,7 +3596,7 @@ function saveCopyHistory(brief, count, timestamp) {
 function renderCopyHistory() {
   const el = document.getElementById('copyHist');
   if (!el) return;
-  const history = getCopyHistory();
+  const history = getCopyHistory().slice().sort((a,b) => (b.ts||0) - (a.ts||0));
   if (!history.length) { el.innerHTML = '<div class="rhe">No sessions yet</div>'; return; }
   el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t">${h.brief.slice(0,32)}${h.brief.length>32?'…':''}</div><div class="hi-d">${h.count} posts · ${h.timestamp}</div></div>`).join('');
 }
@@ -4331,7 +4331,7 @@ function savePennHistory(brief, type, timestamp) {
 function renderPennHistory() {
   const el = document.getElementById('draftHist');
   if (!el) return;
-  const history = getPennHistory();
+  const history = getPennHistory().slice().sort((a,b) => (b.ts||0) - (a.ts||0));
   if (!history.length) { el.innerHTML = '<div class="rhe">No posts yet</div>'; return; }
   el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t">${h.brief.slice(0,34)}${h.brief.length>34?'…':''}</div><div class="hi-d">${h.type} · ${h.timestamp}</div></div>`).join('');
 }
@@ -6390,7 +6390,7 @@ function recordJaxScan(matchCount) {
     const history = JSON.parse(localStorage.getItem('jax_scan_history') || '[]');
     const now = new Date();
     const timeStr = now.toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
-    history.unshift({ time: timeStr, count: matchCount });
+    history.unshift({ time: timeStr, count: matchCount, ts: Date.now() });
     if (history.length > 5) history.length = 5;
     localStorage.setItem('jax_scan_history', JSON.stringify(history));
     renderEngageScanHistory();
@@ -6401,7 +6401,7 @@ function renderEngageScanHistory() {
   const el = document.getElementById('engageScanHistory');
   if (!el) return;
   try {
-    const history = JSON.parse(localStorage.getItem('jax_scan_history') || '[]');
+    const history = JSON.parse(localStorage.getItem('jax_scan_history') || '[]').slice().sort((a,b) => (b.ts||0) - (a.ts||0));
     if (!history.length) { el.innerHTML = '<div class="rhe">No scans yet</div>'; return; }
     el.innerHTML = history.map(h => `<div class="hi"><div class="hi-t" style="color:var(--muted)">${h.time}</div><div class="hi-d">${h.count} ${h.count === 1 ? 'match' : 'matches'} found</div></div>`).join('');
   } catch(e) { el.innerHTML = '<div class="rhe">No scans yet</div>'; }
