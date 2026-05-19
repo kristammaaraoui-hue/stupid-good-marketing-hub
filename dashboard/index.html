@@ -1423,10 +1423,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div class="rh-name">Rex</div>
         <div class="rh-lbl" style="color:var(--scout);margin-top:2px;">SCOUT · Intel Agent</div>
         <div class="rh-desc">Monitors competitors across Instagram, X, TikTok, newsletters, and web. Surfaces what's working — and your angle on it.</div>
-        <div class="rh-status"><div class="sdot-pulse" style="background:var(--scout);box-shadow:0 0 6px var(--scout)"></div><span style="color:var(--muted);font-size:11px;">Ready</span></div>
+        <div class="rh-status" id="rexStatus"><div class="sdot-pulse" id="rexStatusDot" style="background:var(--scout);box-shadow:0 0 6px var(--scout)"></div><span style="color:var(--muted);font-size:11px;" id="rexStatusText">Ready</span></div>
       </div>
       <div style="padding:14px 14px 8px;">
-        <div style="margin-top:0;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;">Platforms</div>
+        <div style="margin-top:0;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted2);margin-bottom:6px;">Monitoring</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;">
           <span style="font-size:9.5px;padding:2px 7px;border-radius:5px;background:rgba(255,107,53,0.1);color:var(--scout);border:1px solid rgba(255,107,53,0.25);">Instagram</span>
           <span style="font-size:9.5px;padding:2px 7px;border-radius:5px;background:rgba(255,107,53,0.1);color:var(--scout);border:1px solid rgba(255,107,53,0.25);">X</span>
@@ -1434,7 +1434,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <span style="font-size:9.5px;padding:2px 7px;border-radius:5px;background:rgba(255,107,53,0.1);color:var(--scout);border:1px solid rgba(255,107,53,0.25);">Newsletter</span>
           <span style="font-size:9.5px;padding:2px 7px;border-radius:5px;background:rgba(255,107,53,0.1);color:var(--scout);border:1px solid rgba(255,107,53,0.25);">Web</span>
         </div>
-        <div style="margin-top:10px;font-size:9px;color:var(--muted2);">Scan frequency: Weekly</div>
+      </div>
+      <div class="rail-hist">
+        <div class="rht">Recent</div>
+        <div id="scoutRailHistory"><div class="rhe">No activity yet</div></div>
       </div>
     </div>
     <div class="ws-main">
@@ -7509,12 +7512,97 @@ function getScoutHistory() {
   try { return JSON.parse(localStorage.getItem('sg_scout_history') || '[]'); } catch(e) { return []; }
 }
 
+function getCampaignHistory() {
+  try { return JSON.parse(localStorage.getItem('sg_campaign_history') || '[]'); } catch(e) { return []; }
+}
+
 function saveScoutScan(scanData, timestamp) {
-  const history = getScoutHistory();
-  history.unshift({ timestamp, data: scanData });
-  if (history.length > 10) history.length = 10; // keep last 10 scans
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const history = getScoutHistory().filter(h => !h.ts || h.ts > cutoff);
+  history.unshift({ timestamp, ts: Date.now(), data: scanData });
+  if (history.length > 30) history.length = 30;
   localStorage.setItem('sg_scout_history', JSON.stringify(history));
   renderScoutHistoryPanel();
+  renderScoutRailHistory();
+}
+
+function saveCampaignHistory(campaign, month, timestamp) {
+  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const history = getCampaignHistory().filter(h => !h.ts || h.ts > cutoff);
+  history.unshift({ month, timestamp, ts: Date.now(), campaign });
+  if (history.length > 30) history.length = 30;
+  localStorage.setItem('sg_campaign_history', JSON.stringify(history));
+  renderScoutRailHistory();
+}
+
+function renderScoutRailHistory() {
+  const el = document.getElementById('scoutRailHistory');
+  if (!el) return;
+  const scans = getScoutHistory().map((h, i) => ({
+    type:'scan', timestamp:h.timestamp, ts:h.ts||0, idx:i,
+    intel:(h.data?.intel||[]).length, trends:(h.data?.trends||[]).length
+  }));
+  const camps = getCampaignHistory().map((h, i) => ({
+    type:'campaign', timestamp:h.timestamp, ts:h.ts||0, idx:i,
+    month:h.month, theme:h.campaign?.theme
+  }));
+  const all = [...scans, ...camps].sort((a,b) => b.ts - a.ts).slice(0,20);
+  if (!all.length) { el.innerHTML = '<div class="rhe">No activity yet</div>'; return; }
+  el.innerHTML = all.map(item => {
+    if (item.type === 'scan') {
+      return `<div class="hi" onclick="setScoutTab('intel',document.getElementById('scout-tab-intel'));loadScoutScan(${item.idx})" style="cursor:pointer;">
+        <div class="hi-t" style="color:var(--scout);">⚲ Scan · ${item.timestamp}</div>
+        <div class="hi-d">${item.intel} competitor${item.intel!==1?'s':''} · ${item.trends} trend${item.trends!==1?'s':''}</div>
+      </div>`;
+    } else {
+      return `<div class="hi" onclick="setScoutTab('campaign',document.getElementById('scout-tab-campaign'));loadCampaignHistory(${item.idx})" style="cursor:pointer;">
+        <div class="hi-t" style="color:var(--scout);">⚑ Campaign · ${item.timestamp}</div>
+        <div class="hi-d">${item.month}${item.theme?' · '+item.theme:''}</div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function loadCampaignHistory(index) {
+  const history = getCampaignHistory();
+  if (!history[index]) return;
+  const entry = history[index];
+  currentCampaign = entry.campaign;
+  scoutMonth = entry.month;
+  const out = document.getElementById('scoutCampaignOutput');
+  if (!out) return;
+  const c = entry.campaign;
+  const colorMap = { green:'var(--green)', purple:'var(--purple)', yellow:'var(--yellow)', red:'var(--red)' };
+  out.innerHTML = `
+    <div style="background:var(--card);border:1px solid rgba(255,107,53,0.3);border-radius:12px;padding:18px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:var(--text);">${entry.month} Campaign</div>
+          <div style="font-size:11px;color:var(--scout);font-weight:700;margin-top:2px;">${(c.theme||'').toUpperCase()}</div>
+        </div>
+        <span style="font-size:10px;padding:3px 10px;border-radius:20px;background:rgba(255,107,53,0.08);color:var(--scout);border:1px solid rgba(255,107,53,0.25);font-weight:700;">From ${entry.timestamp}</span>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">"${c.tagline||''}"</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:16px;">${c.rationale||''}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${(c.agents||[]).map(a=>`
+          <div style="padding:10px 12px;border-radius:8px;background:var(--card2);border:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+            <span style="font-size:9px;font-weight:800;color:${colorMap[a.color]||'var(--text)'};letter-spacing:0.08em;padding-top:1px;min-width:44px;">${a.label}</span>
+            <div style="flex:1;"><span style="font-size:11.5px;font-weight:700;color:var(--text);">${a.name} — </span><span style="font-size:11px;color:var(--muted);">${a.tasks}</span></div>
+          </div>`).join('')}
+      </div>
+      <button onclick="sendCampaignToAgents(this)" style="margin-top:14px;width:100%;padding:10px;border-radius:9px;background:var(--scout);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;">⚑ Send Brief to All Agents</button>
+    </div>`;
+}
+
+function setRexStatus(text, scanning) {
+  const dot = document.getElementById('rexStatusDot');
+  const txt = document.getElementById('rexStatusText');
+  if (dot) {
+    dot.style.background = scanning ? 'var(--yellow)' : 'var(--scout)';
+    dot.style.boxShadow = scanning ? '0 0 6px var(--yellow)' : '0 0 6px var(--scout)';
+  }
+  if (txt) txt.textContent = text;
 }
 
 function renderScoutHistoryPanel() {
@@ -7537,9 +7625,10 @@ function loadScoutScan(index) {
   window.scoutLastScan = entry.timestamp;
   const feed = document.getElementById('scoutIntelFeed');
   if (feed) feed.innerHTML = '';
-  renderScoutIntelFromCache(entry.data, entry.timestamp);
+  renderScoutIntelFromCache(entry.data, `Scan: ${entry.timestamp}`);
   const scannedEl = document.getElementById('scoutLastScannedText');
-  if (scannedEl) scannedEl.textContent = `Showing scan: ${entry.timestamp}`;
+  if (scannedEl) scannedEl.textContent = `Showing: ${entry.timestamp} · ${(entry.data?.intel||[]).length} competitors`;
+  setRexStatus('Scanned ' + entry.timestamp, false);
 }
 
 function renderScoutIntelFromCache(parsed, label) {
@@ -7616,10 +7705,27 @@ function renderScoutIntel() {
 function renderScoutIdeas() {
   const feed = document.getElementById('scoutIdeaFeed');
   if (!feed) return;
-  // Prefer live scan ideas over static fallback
-  const ideas = (window.scoutIntelCache?.ideas?.length) ? window.scoutIntelCache.ideas : SCOUT_IDEAS;
-  const isLive = !!(window.scoutIntelCache?.ideas?.length);
-  feed.innerHTML = (isLive ? `<div style="font-size:10.5px;color:var(--scout);font-weight:700;margin-bottom:10px;">LIVE IDEAS · from ${window.scoutLastScan || 'last scan'}</div>` : '') +
+  // Priority: live session cache → latest localStorage scan → static fallback
+  let ideas, ideaLabel;
+  if (window.scoutIntelCache?.ideas?.length) {
+    ideas = window.scoutIntelCache.ideas;
+    ideaLabel = window.scoutLastScan || 'last scan';
+  } else {
+    const history = getScoutHistory();
+    const latest = history.find(h => h.data?.ideas?.length);
+    if (latest) {
+      ideas = latest.data.ideas;
+      ideaLabel = latest.timestamp;
+      // Restore cache so send functions work
+      window.scoutIntelCache = latest.data;
+      window.scoutLastScan = latest.timestamp;
+    } else {
+      ideas = SCOUT_IDEAS;
+      ideaLabel = null;
+    }
+  }
+  const isLive = !!ideaLabel;
+  feed.innerHTML = (isLive ? `<div style="font-size:10.5px;color:var(--scout);font-weight:700;margin-bottom:10px;">IDEAS · from ${ideaLabel}</div>` : '') +
   ideas.map((item,i) => `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
@@ -7640,6 +7746,7 @@ function renderScoutIdeas() {
 async function runScoutScan() {
   const feed = document.getElementById('scoutIntelFeed');
   feed.innerHTML = `<div class="loading-wrap"><div class="spinner" style="border-top-color:var(--scout)"></div><div class="ld-text">Scanning Instagram · TikTok · X…</div><div class="ld-sub">Yelp · OpenTable · Resy · Beli Eats · Eater · Infatuation</div></div>`;
+  setRexStatus('Scanning…', true);
   try {
     const raw = await callClaudeWithSearch(SCOUT_SYSTEM,
       `Search the web right now for the latest social media content and campaigns from restaurant discovery and food recommendation apps. Search for:
@@ -7670,9 +7777,11 @@ Return the JSON as specified in your instructions.`
     toast(`Scout scanned ${intel.length} competitors · intel live`, 'var(--scout)');
     const scannedEl = document.getElementById('scoutLastScannedText');
     if (scannedEl) scannedEl.textContent = `Last scanned: ${window.scoutLastScan} · ${intel.length} competitors · ${trends.length} trends`;
+    setRexStatus('Scanned ' + window.scoutLastScan, false);
   } catch(e) {
     feed.innerHTML = `<div style="color:var(--red);font-size:13px;padding:16px;">${e.message}</div>`;
     toast('Scout scan failed: ' + e.message, 'var(--red)');
+    setRexStatus('Scan failed', false);
   }
 }
 
@@ -7703,6 +7812,8 @@ Return ONLY valid JSON:
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const c = JSON.parse(jsonMatch ? jsonMatch[0] : raw);
     currentCampaign = c;
+    const campTimestamp = new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+    saveCampaignHistory(c, scoutMonth, campTimestamp);
     const colorMap = { green:'var(--green)', purple:'var(--purple)', yellow:'var(--yellow)', red:'var(--red)' };
 
     out.innerHTML = `
@@ -7779,9 +7890,12 @@ function sendCampaignToAgents(btn) {
   // Populate Penn (blog/draft) brief
   const draftBrief = document.getElementById('draftBrief');
   if (draftBrief) draftBrief.value = brief;
+  // Populate Nova (graphic) brief
+  const pixelBrief = document.getElementById('pixelBrief');
+  if (pixelBrief) pixelBrief.value = `${scoutMonth} campaign: ${c.theme || ''} — ${c.tagline || ''}`;
 
   if (btn) { btn.textContent = '✓ Brief sent to all agents'; btn.style.background = 'var(--green)'; }
-  toast('Campaign brief sent to Sloane + Penn — briefs pre-filled', 'var(--scout)');
+  toast('Campaign brief sent to Sloane · Penn · Nova — briefs pre-filled', 'var(--scout)');
 }
 
 function sendIdeaToCopy(i) {
@@ -8315,6 +8429,15 @@ renderCommandCenter();
 renderCopyEmptyState();
 initSettingsPlatChips();
 renderEngageScanHistory();
+renderScoutRailHistory();
+// Restore Rex status from last scan
+(function() {
+  const h = getScoutHistory();
+  if (h.length) {
+    const txt = document.getElementById('rexStatusText');
+    if (txt) txt.textContent = 'Scanned ' + h[0].timestamp;
+  }
+})();
 
 // ── BLOG PREVIEW ─────────────────────────────────────────────────────────────
 
