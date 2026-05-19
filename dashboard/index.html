@@ -7605,23 +7605,7 @@ function setScoutTab(tab, el) {
   if (tab === 'intel') renderScoutIntel();
 }
 
-const SCOUT_INTEL = [
-  { brand:'Yelp', platform:'instagram', type:'Campaign', date:'Apr 28', title:'"Neighborhood Gems" Series', summary:'Weekly carousel series spotlighting hidden local spots. Heavy UGC, user-submitted photos. Getting 3-5k likes per post.', angle:'We can counter with AI-curated hidden gems — same concept, smarter curation.' },
-  { brand:'Resy', platform:'newsletter', type:'Newsletter', date:'Apr 27', title:'"The Reservation Report"', summary:'Weekly email with trending restaurants, new openings, and "hard to get" reservation tips. Open rate estimated 38%.', angle:'Our take: skip the reservation hustle entirely — AI finds you equally good spots with no wait.' },
-  { brand:'OpenTable', platform:'x', type:'Campaign', date:'Apr 26', title:'"Dine Out, Give Back" Push', summary:'Partnered with restaurant charities. Every reservation = $1 donated. Big social push with #DineForGood.', angle:'Their angle is guilt. Ours is taste. Worth noting the cause-marketing play for future reference.' },
-  { brand:'Beli Eats', platform:'tiktok', type:'Content', date:'Apr 25', title:'"Rate Everything" Challenge', summary:'UGC challenge where users film themselves rating random food. Trending audio. 2M+ views on top post.', angle:'Their content is about rating. Ours is about knowing before you go. "Stop rating, start knowing."' },
-  { brand:'NyGuide', platform:'instagram', type:'Content', date:'Apr 24', title:'"Best Of NYC" Reels', summary:'Short-form "best [food type] in NYC" reels. Simple format, consistent engagement. ~800-1200 views each.', angle:'We can do this with AI credibility — "AI-vetted best pasta in NYC" hits differently than a human list.' },
-  { brand:'Eater', platform:'newsletter', type:'Newsletter', date:'Apr 29', title:'Eater NY Daily Digest', summary:'Daily newsletter covering new openings, closures, and food news. High open rates, massive editorial authority in the foodie space.', angle:'They have authority from editorial volume. We have authority from personalization. Eater tells everyone what opened. We tell you what the right pick is for you specifically.' },
-];
-
-const SCOUT_IDEAS = [
-  { brand:'Yelp', idea:'"Hidden Gem" content series', hook:'Every city has restaurants the algorithm buries. We surface them.', steal:'Turn into weekly Instagram carousel or blog: "3 AI-Discovered Hidden Gems in [City]"' },
-  { brand:'Resy', idea:'Reservation anxiety angle', hook:'The stress of trying to get a table at a hot spot — Resy profits from it. We solve it.', steal:'Hot take post: "The hottest restaurant in your city probably isn\'t worth the wait. Here\'s what is."' },
-  { brand:'Beli Eats', idea:'Rating culture critique', hook:'Everyone\'s rating restaurants but nobody actually knows what they want.', steal:'TikTok hook: "Rating apps give you data. Stupid Good AI gives you a recommendation."' },
-  { brand:'OpenTable', idea:'Cause marketing gap', hook:'They\'re doing charity. We\'re doing accuracy. Different values, different audience.', steal:'Brand story post: "We\'re not trying to make you feel good about where you eat. We\'re trying to make you eat somewhere actually good."' },
-  { brand:'NyGuide', idea:'"Best of city" format', hook:'Simple, repeatable, gets clicks. We add AI credibility.', steal:'Weekly Instagram post: "AI-ranked: Top 3 [cuisine] spots in [city] this week"' },
-  { brand:'Eater', idea:'Daily editorial digest angle', hook:'Eater has massive reach but zero personalization. Everyone gets the same list.', steal:'Counter-position on X: "Eater tells you what opened. Stupid Good AI tells you what\'s worth it — for you specifically."' },
-];
+// SCOUT_INTEL and SCOUT_IDEAS removed — all intel and ideas come from live scans only
 
 function getScoutHistory() {
   try { return JSON.parse(localStorage.getItem('sg_scout_history') || '[]'); } catch(e) { return []; }
@@ -7830,7 +7814,7 @@ function renderScoutIdeas() {
         <div style="font-size:28px;margin-bottom:12px;opacity:0.5;">💡</div>
         <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px;">No ideas yet</div>
         <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;max-width:280px;margin-left:auto;margin-right:auto;">Run a scan first — Rex will generate content ideas based on live competitor activity.</div>
-        <button onclick="setScoutTab('intel');runScoutScan()" style="padding:8px 20px;border-radius:9px;background:var(--scout);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;">Run First Scan →</button>
+        <button onclick="setScoutTab('intel',document.getElementById('scout-tab-intel'));runScoutScan()" style="padding:8px 20px;border-radius:9px;background:var(--scout);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;">Run First Scan →</button>
       </div>`;
       return;
     }
@@ -8030,25 +8014,7 @@ function sendCampaignToAgents(btn) {
   toast('Campaign brief sent to Sloane · Penn · Nova · Jax — all agents briefed', 'var(--scout)');
 }
 
-function sendIdeaToCopy(i) {
-  const idea = SCOUT_IDEAS[i];
-  goAgent('copy');
-  setTimeout(() => {
-    const brief = document.getElementById('copyBrief');
-    if (brief) brief.value = idea.steal;
-    toast('Idea sent to Sloane — brief pre-filled', 'var(--green)');
-  }, 300);
-}
-function sendIdeaToPenn(i) {
-  const idea = SCOUT_IDEAS[i];
-  goAgent('draft');
-  setTimeout(() => {
-    const brief = document.getElementById('draftBrief');
-    if (brief) brief.value = idea.steal;
-    toast('Idea sent to Penn — brief pre-filled', 'var(--yellow)');
-  }, 300);
-}
-// Live idea send (from Scout's live scan results)
+// All idea sends use live scan results only
 function sendLiveIdeaToCopy(i) {
   const ideas = window.scoutIntelCache?.ideas || [];
   const idea = ideas[i];
