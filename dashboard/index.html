@@ -1301,9 +1301,31 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
               <div class="scale-row" style="margin-bottom:8px;margin-top:8px;">
                 <span class="scale-label">B-Roll</span>
               </div>
-              <div class="scale-chips">
+              <div class="scale-chips" id="reelBrollChips">
                 <div class="sc selected-p" id="rb-pexels" onclick="setReelBroll('pexels',this)">Auto from Pexels</div>
+                <div class="sc" id="rb-upload" onclick="setReelBroll('upload',this)" style="display:flex;align-items:center;gap:5px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  My Footage
+                  <span id="reelMediaCount" style="display:none;background:var(--purple);color:#fff;font-size:9px;font-weight:800;padding:1px 5px;border-radius:10px;min-width:14px;text-align:center;"></span>
+                </div>
                 <div class="sc" id="rb-text" onclick="setReelBroll('text',this)">Text Only</div>
+              </div>
+
+              <!-- MY FOOTAGE upload zone (shown when rb-upload selected) -->
+              <div id="reelUploadZone" style="display:none;margin-top:10px;">
+                <div id="reelDropTarget"
+                  style="border:2px dashed rgba(242,84,253,0.35);border-radius:10px;padding:16px 14px;text-align:center;cursor:pointer;transition:border-color 0.15s,background 0.15s;"
+                  onclick="document.getElementById('reelFileInput').click()"
+                  ondragover="event.preventDefault();this.style.borderColor='var(--purple)';this.style.background='rgba(242,84,253,0.06)'"
+                  ondragleave="this.style.borderColor='rgba(242,84,253,0.35)';this.style.background=''"
+                  ondrop="event.preventDefault();this.style.borderColor='rgba(242,84,253,0.35)';this.style.background='';handleReelMediaDrop(event.dataTransfer.files)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgba(242,84,253,0.6)" stroke-width="1.8" style="margin-bottom:6px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;">Drop images or video clips here</div>
+                  <div style="font-size:10.5px;color:var(--muted);">JPG · PNG · MP4 · MOV · up to 50MB each</div>
+                </div>
+                <input type="file" id="reelFileInput" multiple accept="image/jpeg,image/png,image/gif,video/mp4,video/quicktime,video/mov" style="display:none;" onchange="handleReelMediaUpload(this.files)">
+                <div id="reelMediaPreviews" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+                <div id="reelUploadStatus" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
               </div>
 
               <div class="ic-footer" style="margin-top:14px;">
@@ -7380,7 +7402,7 @@ function getPexelsKey()        { return localStorage.getItem('sg_pexels_key') ||
 function getElevenLabsKey()    { return localStorage.getItem('sg_elevenlabs_key') || ''; }
 function getElevenLabsVoice()  { return localStorage.getItem('sg_elevenlabs_voice') || ''; }
 
-let reelState = { style: 'pain', dur: '15', broll: 'pexels' };
+let reelState = { style: 'pain', dur: '15', broll: 'pexels', userMedia: [] };
 
 function setReelStyle(s, el) {
   reelState.style = s;
@@ -7396,15 +7418,98 @@ function setReelDur(d, el) {
 }
 function setReelBroll(b, el) {
   reelState.broll = b;
-  document.querySelectorAll('#pixelTabReels .scale-chips:nth-of-type(3) .sc, #pixelTabReels .scale-chips:last-of-type .sc').forEach(c => c.classList.remove('selected-p'));
-  document.querySelectorAll('#pixelTabReels .sc').forEach(c => { if(c.id===`rb-${b}`) c.classList.add('selected-p'); });
+  document.querySelectorAll('#reelBrollChips .sc').forEach(c => c.classList.remove('selected-p'));
+  el.classList.add('selected-p');
+  // Show/hide upload zone
+  const zone = document.getElementById('reelUploadZone');
+  if (zone) zone.style.display = b === 'upload' ? 'block' : 'none';
   updateReelHint();
 }
 function updateReelHint() {
   const labels = { pain:'Pain Point', claim:'Bold Claim', lifestyle:'Lifestyle', comparison:'Text Comparison' };
-  const bLabel = reelState.broll === 'text' ? 'Text-only' : 'Pexels B-roll';
+  const bLabel = reelState.broll === 'text' ? 'Text-only' : reelState.broll === 'upload' ? `My Footage (${reelState.userMedia.length} file${reelState.userMedia.length!==1?'s':''})` : 'Pexels B-roll';
   const el = document.getElementById('reelHint');
   if (el) el.textContent = `${labels[reelState.style] || reelState.style} · ~${reelState.dur}s · ${bLabel}`;
+}
+
+// ── REEL MEDIA UPLOAD ─────────────────────────────────────────────────────────
+function handleReelMediaDrop(files) { handleReelMediaUpload(files); }
+
+async function handleReelMediaUpload(files) {
+  if (!files?.length) return;
+  const statusEl = document.getElementById('reelUploadStatus');
+  const previewEl = document.getElementById('reelMediaPreviews');
+  const countEl  = document.getElementById('reelMediaCount');
+
+  const allowed = ['image/jpeg','image/png','image/gif','video/mp4','video/quicktime','video/mov'];
+  const toUpload = Array.from(files).filter(f => allowed.includes(f.type) || f.name.match(/\.(mp4|mov|jpg|jpeg|png|gif)$/i));
+  if (!toUpload.length) { toast('No supported files — use JPG, PNG, MP4, or MOV', 'var(--red)'); return; }
+
+  let done = 0;
+  statusEl.textContent = `Uploading ${toUpload.length} file${toUpload.length>1?'s':''}…`;
+
+  for (const file of toUpload) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const ts  = Date.now();
+    const fname = `user-media-${ts}-${Math.random().toString(36).slice(2,7)}.${ext}`;
+    try {
+      const buf = await file.arrayBuffer();
+      const resp = await fetch(`${SB_URL}/storage/v1/object/post-images/${fname}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-upsert': 'true'
+        },
+        body: buf
+      });
+      if (!resp.ok) throw new Error('Upload failed');
+      const publicUrl = `${SB_URL}/storage/v1/object/public/post-images/${fname}`;
+      const isVideo = file.type.startsWith('video') || /\.(mp4|mov)$/i.test(file.name);
+      reelState.userMedia.push({ url: publicUrl, name: file.name, type: isVideo ? 'video' : 'image' });
+      done++;
+
+      // Render preview card
+      const card = document.createElement('div');
+      card.id = `rm-${fname}`;
+      card.style.cssText = 'position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border);flex-shrink:0;';
+      if (isVideo) {
+        card.innerHTML = `<div style="width:100%;height:100%;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:20px;">🎬</div>`;
+      } else {
+        const objUrl = URL.createObjectURL(file);
+        card.innerHTML = `<img src="${objUrl}" style="width:100%;height:100%;object-fit:cover;" onload="URL.revokeObjectURL(this.src)">`;
+      }
+      // Remove button
+      const rmBtn = document.createElement('button');
+      rmBtn.innerHTML = '×';
+      rmBtn.style.cssText = 'position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:rgba(0,0,0,0.6);color:#fff;border:none;font-size:11px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;';
+      rmBtn.onclick = () => {
+        reelState.userMedia = reelState.userMedia.filter(m => m.url !== publicUrl);
+        card.remove();
+        updateReelMediaCount();
+        updateReelHint();
+      };
+      card.appendChild(rmBtn);
+      previewEl.appendChild(card);
+    } catch(e) {
+      toast(`Failed to upload ${file.name}`, 'var(--red)');
+    }
+  }
+
+  updateReelMediaCount();
+  statusEl.textContent = `${done} of ${toUpload.length} file${toUpload.length>1?'s':''} ready`;
+  updateReelHint();
+  // Reset input so same files can be re-selected
+  const inp = document.getElementById('reelFileInput');
+  if (inp) inp.value = '';
+}
+
+function updateReelMediaCount() {
+  const n = reelState.userMedia.length;
+  const el = document.getElementById('reelMediaCount');
+  if (!el) return;
+  el.textContent = n;
+  el.style.display = n > 0 ? 'inline-block' : 'none';
 }
 
 function updateCreatomateStatus() {
@@ -7553,7 +7658,7 @@ Return ONLY a JSON array with exactly ${numScenes} objects:
 }
 
 function buildReelSource(scenes, videoUrls, style, voiceoverUrl) {
-  const useBroll = reelState.broll === 'pexels' && videoUrls.some(v => v);
+  const useBroll = (reelState.broll === 'pexels' || reelState.broll === 'upload') && videoUrls && videoUrls.some(v => v);
   const bgColors = { pain:'#0a0a14', claim:'#0a0a0a', lifestyle:'#0d1a0d', comparison:'#0a0a0a' };
   const bgColor = bgColors[style] || '#0a0a0a';
 
@@ -7596,15 +7701,17 @@ function buildReelSource(scenes, videoUrls, style, voiceoverUrl) {
       composition.transition = { type: 'fade', duration: 0.3 };
     }
 
-    // B-roll video background
+    // B-roll background — video (Pexels or user clip) or image (user upload)
     if (useBroll && videoUrl) {
-      composition.elements.push({
-        type: 'video',
-        source: videoUrl,
-        volume: '0%',
-        fit: 'cover',
-        duration: null
-      });
+      // Detect if user uploaded an image (not video) by checking reelState.userMedia
+      const mediaEntry = reelState.broll === 'upload'
+        ? reelState.userMedia[i % reelState.userMedia.length]
+        : null;
+      const isImageAsset = mediaEntry?.type === 'image' || /\.(jpg|jpeg|png|gif)(\?|$)/i.test(videoUrl);
+      composition.elements.push(isImageAsset
+        ? { type: 'image', source: videoUrl, fit: 'cover', duration: null }
+        : { type: 'video', source: videoUrl, volume: '0%', fit: 'cover', duration: null }
+      );
     }
 
     // Brand accent bar (top)
@@ -7706,6 +7813,11 @@ async function generateReel() {
     document.getElementById('reelBrief').focus();
     return;
   }
+  if (reelState.broll === 'upload' && !reelState.userMedia.length) {
+    toast('Upload at least one image or clip first', 'var(--purple)');
+    document.getElementById('reelDropTarget')?.click();
+    return;
+  }
 
   const out = document.getElementById('reelOutput');
   out.innerHTML = loadingHTML('purple', 'Writing reel script…', 'Calling Claude AI · Building scene-by-scene script');
@@ -7715,18 +7827,31 @@ async function generateReel() {
     const scenes = await generateReelScript(brief, reelState.style, reelState.dur);
     if (!scenes?.length) throw new Error('No scenes generated');
 
-    // 2. Fetch Pexels B-roll + generate voiceover in parallel
-    const hasPexels = reelState.broll === 'pexels' && getPexelsKey();
-    const hasVoice  = getElevenLabsKey() && getElevenLabsVoice();
-    const steps = [hasPexels ? 'B-roll' : null, hasVoice ? 'voiceover' : null].filter(Boolean);
-    out.innerHTML = loadingHTML('purple',
-      steps.length ? `Sourcing ${steps.join(' + ')}…` : 'Building reel…',
-      `${hasPexels ? 'Downloading clips from Pexels → uploading to Supabase' : 'Text-only mode'} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'} · This takes ~30s`
-    );
+    // 2. Resolve B-roll sources + generate voiceover in parallel
+    const hasPexels  = reelState.broll === 'pexels' && getPexelsKey();
+    const hasUpload  = reelState.broll === 'upload' && reelState.userMedia.length > 0;
+    const hasVoice   = getElevenLabsKey() && getElevenLabsVoice();
+
+    if (hasUpload) {
+      out.innerHTML = loadingHTML('purple', 'Building reel with your footage…',
+        `Using ${reelState.userMedia.length} uploaded file${reelState.userMedia.length!==1?'s':''} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'}`);
+    } else {
+      const steps = [hasPexels ? 'B-roll' : null, hasVoice ? 'voiceover' : null].filter(Boolean);
+      out.innerHTML = loadingHTML('purple',
+        steps.length ? `Sourcing ${steps.join(' + ')}…` : 'Building reel…',
+        `${hasPexels ? 'Downloading clips from Pexels → uploading to Supabase' : 'Text-only mode'} · ${hasVoice ? 'ElevenLabs voiceover generating' : 'Background music'} · This takes ~30s`);
+    }
+
+    // For uploaded footage: cycle media URLs across scenes
+    const uploadedVideoUrls = hasUpload
+      ? scenes.map((_, i) => reelState.userMedia[i % reelState.userMedia.length].url)
+      : null;
 
     const [videoUrls, voiceoverUrl] = await Promise.all([
-      hasPexels ? Promise.all(scenes.map(s => searchPexels(s.pexels_query))) : Promise.resolve(scenes.map(() => null)),
-      hasVoice  ? generateVoiceover(scenes) : Promise.resolve(null)
+      hasUpload  ? Promise.resolve(uploadedVideoUrls) :
+      hasPexels  ? Promise.all(scenes.map(s => searchPexels(s.pexels_query))) :
+                   Promise.resolve(scenes.map(() => null)),
+      hasVoice   ? generateVoiceover(scenes) : Promise.resolve(null)
     ]);
 
     // 3. Build Creatomate source
