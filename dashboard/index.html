@@ -1729,6 +1729,19 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <button class="rbtn" style="padding:5px 12px;color:var(--red);border-color:rgba(255,40,31,0.3);white-space:nowrap;" onclick="addJaxKeyword()">+ Add</button>
         </div>
       </div>
+      <div class="rail-sec">
+        <div class="rail-sec-title">Target Profile</div>
+        <div style="padding:6px 10px;font-size:11px;color:var(--muted);line-height:1.7;">
+          <div>👥 <strong style="color:var(--text);">Audience:</strong> Restaurant &amp; food biz owners</div>
+          <div>🎯 <strong style="color:var(--text);">Signals:</strong> Pain points · Questions · Hot takes</div>
+          <div>⏱ <strong style="color:var(--text);">Recency:</strong> Under 24 hours</div>
+          <div>💬 <strong style="color:var(--text);">Pitch:</strong> When relevant</div>
+          <div>🚫 <strong style="color:var(--text);">Skip:</strong> Political content</div>
+        </div>
+        <div style="padding:4px 10px;">
+          <button id="jaxScanNowBtn" class="genbtn" onclick="triggerJaxScanNow()" style="width:100%;background:var(--red);color:#fff;border:none;font-size:12px;font-weight:700;padding:9px 0;border-radius:10px;cursor:pointer;">⚡ Scan Now</button>
+        </div>
+      </div>
       <div class="rail-hist">
         <div class="rht">Last Scans</div>
         <div id="engageScanHistory"><div class="rhe">No scans yet</div></div>
@@ -6102,11 +6115,38 @@ function checkEngageAutoScan() {
 }
 
 async function runEngageScan() {
-  // Refresh the real JAX review queue from Google Sheet
   localStorage.setItem('jax_last_scan', String(Date.now()));
   updateNextScanLabel(localStorage.getItem('jax_schedule') || '3x');
+
+  // Fire the n8n scan trigger with current profile + keywords
+  const profile = getJaxProfile();
+  const keywords = getJaxKeywords();
+  try {
+    const resp = await fetch(JAX_SCAN_TRIGGER, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + JAX_AUTH },
+      body: JSON.stringify({ keywords, profile })
+    });
+    if (resp.ok) {
+      toast('Scan triggered — results will appear in 1–2 min', 'var(--red)');
+      // Auto-refresh queue after brief delay to catch new results
+      setTimeout(() => loadJaxQueue(), 90000);
+    } else {
+      toast('Scan trigger returned ' + resp.status + ' — check n8n webhook', 'var(--yellow)');
+    }
+  } catch(e) {
+    // Webhook not yet set up — fall back to just refreshing the sheet
+    toast('n8n scan webhook not connected — refreshing sheet', 'var(--muted)');
+  }
+
   await loadJaxQueue();
-  toast('Queue refreshed from n8n', 'var(--red)');
+}
+
+async function triggerJaxScanNow() {
+  const btn = document.getElementById('jaxScanNowBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Scanning…'; }
+  await runEngageScan();
+  if (btn) { btn.disabled = false; btn.textContent = '⚡ Scan Now'; }
 }
 
 // ── JAX FOLLOWER FILTER ───────────────────────────────────────────────────────
@@ -6135,18 +6175,27 @@ function initJaxFollowerFilter() {
 
 // ── JAX KEYWORDS ─────────────────────────────────────────────────────────────
 const JAX_DEFAULT_KEYWORDS = [
-  'where should we eat tonight','restaurant recommendation tonight','help me find somewhere to eat',
-  'where should I eat','can\'t decide where to eat','need a dinner recommendation',
-  'yelp reviews are useless','yelp is useless','google reviews are useless',
-  'can\'t trust restaurant reviews','too many food apps',
-  'checked TikTok Instagram Reddit still can\'t decide','decision fatigue food',
-  'where to eat tonight','just found a hidden gem restaurant',
-  'no one is talking about this restaurant','underrated restaurant',
-  'date night restaurant','need a restaurant for a date',
-  'restaurant that says I planned this','planning a romantic dinner',
-  'tasting menus are a scam','hot take dining','restaurant hot take',
-  'overrated restaurant','where to eat in','best restaurants in',
-  'food','restaurant','foodie','dining','AI food'
+  // Pain points — getting customers
+  'restaurant owner slow season','nobody comes in','foot traffic is dead',
+  'can\'t get new customers restaurant','restaurant struggling to get customers',
+  'slow week at the restaurant','empty restaurant','restaurant dead tonight',
+  // Pain points — marketing & visibility
+  'restaurant marketing doesn\'t work','Google isn\'t sending us customers',
+  'Yelp is useless for my restaurant','how do I get more customers restaurant',
+  'restaurant not showing up on Google','nobody knows about my restaurant',
+  'restaurant visibility problem','how to get discovered restaurant',
+  'food business marketing help','restaurant social media not working',
+  // Pain points — food trucks & small operators
+  'food truck nobody shows up','café owner struggling','bakery not getting customers',
+  'food truck slow day','pop-up not getting traffic',
+  // Hot takes worth engaging
+  'restaurant marketing is a scam','restaurants don\'t need social media',
+  'Yelp destroying small restaurants','Google reviews unfair restaurants',
+  'restaurants don\'t need influencers',
+  // Questions worth answering
+  'how do restaurants get more customers','restaurant owner marketing tips',
+  'best way to market a restaurant','how to get restaurant discovered',
+  'food truck marketing strategy','restaurant TikTok worth it'
 ];
 
 function getJaxKeywords() {
@@ -6188,10 +6237,33 @@ function removeJaxKeyword(idx) {
   toast('Keyword removed', 'var(--muted)');
 }
 
+// ── JAX TARGETING PROFILE ─────────────────────────────────────────────────────
+const JAX_DEFAULT_PROFILE = {
+  topics:     'food discovery, restaurant visibility, food business marketing',
+  signals:    ['pain_point', 'question', 'hot_take'],
+  recency_h:  24,
+  goal:       'drive_traffic',
+  pitch:      'if_relevant',
+  exclusions: ['political'],
+  audience:   'restaurant and food business owners'
+};
+
+function getJaxProfile() {
+  try {
+    const s = localStorage.getItem('sg_jax_profile');
+    return s ? { ...JAX_DEFAULT_PROFILE, ...JSON.parse(s) } : { ...JAX_DEFAULT_PROFILE };
+  } catch(e) { return { ...JAX_DEFAULT_PROFILE }; }
+}
+
+function saveJaxProfile(profile) {
+  try { localStorage.setItem('sg_jax_profile', JSON.stringify(profile)); } catch(e) {}
+}
+
 // ── JAX REVIEW QUEUE ──────────────────────────────────────────────────────────
-const JAX_SHEET_CSV = 'https://docs.google.com/spreadsheets/d/1CRU52Axz_J05gyYVBhQBVwhZcEChueRVc1QEgW9qGNg/export?format=csv&gid=0';
-const JAX_WEBHOOK   = 'https://stupidgoodai.app.n8n.cloud/webhook/approve-reply';
-const JAX_AUTH      = 'jax_a8f3k2mN9pQ4rT7wX1vB6cL0sD5hJ2yE';
+const JAX_SHEET_CSV     = 'https://docs.google.com/spreadsheets/d/1CRU52Axz_J05gyYVBhQBVwhZcEChueRVc1QEgW9qGNg/export?format=csv&gid=0';
+const JAX_WEBHOOK       = 'https://stupidgoodai.app.n8n.cloud/webhook/approve-reply';
+const JAX_SCAN_TRIGGER  = 'https://stupidgoodai.app.n8n.cloud/webhook/jax-scan';
+const JAX_AUTH          = 'jax_a8f3k2mN9pQ4rT7wX1vB6cL0sD5hJ2yE';
 
 function parseJaxCSV(text) {
   const lines = text.trim().split('\n');
@@ -8953,13 +9025,23 @@ renderNovaHistory();
 // ── BLOG PREVIEW ─────────────────────────────────────────────────────────────
 
 function previewBlog(id) {
-  const post = POSTS.find(p => p.id === id);
-  const blog = BLOG_POSTS[id];
+  const post = POSTS.find(p => String(p.id) === String(id));
   if (!post) return;
+  const blog = BLOG_POSTS[id] || BLOG_POSTS[String(id)] || BLOG_POSTS[Number(id)];
+  // Also check cardContents (newsletter / generated blog posts)
+  const cardBody = cardContents[id]?.content || cardContents[String(id)]?.content || null;
   const modal = document.getElementById('blogPreviewModal');
   const title = blog ? blog.title : post.content;
-  const body = blog ? blog.body : '<em>Full content not yet generated. Use BLOGGER to write this post.</em>';
-  const meta = blog ? `${blog.wordCount} · ${blog.readTime} · ${post.pillar}` : `${post.pillar} · ${post.status}`;
+  const rawBody = blog ? blog.body : cardBody || null;
+  const wordCount = rawBody ? rawBody.trim().split(/\s+/).length : 0;
+  const body = rawBody
+    ? rawBody
+    : '<em style="color:var(--muted)">Full content not yet generated — open BLOGGER to write this post.</em>';
+  const meta = blog
+    ? `${blog.wordCount} · ${blog.readTime} · ${post.pillar}`
+    : rawBody
+      ? `~${wordCount} words · ${post.pillar} · ${post.status}`
+      : `${post.pillar} · ${post.status}`;
   document.getElementById('bpm-title').textContent = title;
   document.getElementById('bpm-meta').textContent = meta;
   document.getElementById('bpm-date').textContent = `${post.day}, ${post.date} · ${post.time}`;
