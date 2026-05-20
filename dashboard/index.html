@@ -6260,7 +6260,12 @@ async function loadJaxQueue() {
         // No follower data in sheet: show all, engagement_score sort handles priority
         return true;
       })
-      .sort((a, b) => (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0));
+      .sort((a, b) => {
+        const scoreDiff = (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        // Secondary: newest created_at first
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
     const warn = document.getElementById('jaxFollowerWarn');
     if (warn) warn.style.display = (!hasFollowerData && ffOn) ? 'block' : 'none';
     recordJaxScan(allPending.length);
@@ -8177,10 +8182,13 @@ function loadScoutScan(index) {
 function renderScoutIntelFromCache(parsed, label) {
   const feed = document.getElementById('scoutIntelFeed');
   if (!feed) return;
-  // Sort intel newest-first using dateSort field (falls back to array order)
-  const intel = (parsed.intel || []).slice().sort((a, b) => {
+  // Sort intel newest-first: use dateSort (ISO), then date string, then reverse array order so latest-added appears first
+  const intel = (parsed.intel || []).slice().reverse().sort((a, b) => {
     const da = a.dateSort || a.date || '';
     const db = b.dateSort || b.date || '';
+    if (!da && !db) return 0;
+    if (!da) return 1;   // unknown date goes to bottom
+    if (!db) return -1;
     return db.localeCompare(da);
   });
   const ideas = parsed.ideas || [];
