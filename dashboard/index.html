@@ -1767,12 +1767,20 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:9px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;">
           <label style="font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;">
-            <input type="checkbox" id="jaxFollowerFilter" checked onchange="applyJaxFollowerFilter()" style="cursor:pointer;accent-color:var(--red);"> Medium accounts only
+            <input type="checkbox" id="jaxFollowerFilter" checked onchange="applyJaxFollowerFilter()" style="cursor:pointer;accent-color:var(--red);"> Account size
           </label>
           <span style="font-size:11px;color:var(--muted);">followers:</span>
-          <input type="number" id="jaxMinFollowers" value="10000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <input type="number" id="jaxMinFollowers" value="1000" min="0" style="width:70px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
           <span style="font-size:11px;color:var(--muted);">–</span>
           <input type="number" id="jaxMaxFollowers" value="500000" min="0" style="width:80px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <span style="font-size:11px;color:var(--muted);margin-left:4px;">min likes:</span>
+          <input type="number" id="jaxMinLikes" value="100" min="0" style="width:60px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <span style="font-size:11px;color:var(--muted);">account type:</span>
+          <select id="jaxAccountType" onchange="applyJaxFollowerFilter()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;">
+            <option value="all">All</option>
+            <option value="food" selected>Food &amp; restaurant</option>
+            <option value="marketing">Marketing &amp; biz</option>
+          </select>
         </div>
         <div id="jaxFollowerWarn" style="display:none;margin-bottom:12px;padding:8px 12px;background:rgba(255,217,17,0.07);border:1px solid rgba(255,217,17,0.25);border-radius:8px;font-size:11px;color:var(--yellow);line-height:1.5;">
           No follower data in sheet — filtering by engagement score instead. To filter by actual follower count, add a <strong>follower_count</strong> column to your Google Sheet in n8n (Twitter node → author.public_metrics.followers_count).
@@ -6159,10 +6167,24 @@ function parseFollowerCount(str) {
 }
 
 function getJaxFollowerFilter() {
-  const on = document.getElementById('jaxFollowerFilter')?.checked ?? true;
-  const min = parseInt(document.getElementById('jaxMinFollowers')?.value || '10000');
-  const max = parseInt(document.getElementById('jaxMaxFollowers')?.value || '500000');
-  return { on, min, max };
+  const on       = document.getElementById('jaxFollowerFilter')?.checked ?? true;
+  const min      = parseInt(document.getElementById('jaxMinFollowers')?.value  || '1000');
+  const max      = parseInt(document.getElementById('jaxMaxFollowers')?.value  || '500000');
+  const minLikes = parseInt(document.getElementById('jaxMinLikes')?.value      || '100');
+  const acctType = document.getElementById('jaxAccountType')?.value            || 'all';
+  return { on, min, max, minLikes, acctType };
+}
+
+const FOOD_ACCOUNT_KEYWORDS = [
+  'restaurant','food','chef','foodie','culinary','bakery','café','cafe',
+  'bar','bistro','eatery','kitchen','cook','bake','dining','hospitality',
+  'food truck','pizzeria','sushi','ramen','bbq','farm to table','sommelier'
+];
+
+function matchesFoodAccount(row) {
+  const bio  = (row.author_bio || row.bio || row.user_bio || '').toLowerCase();
+  const name = (row.tweet_author || '').toLowerCase();
+  return FOOD_ACCOUNT_KEYWORDS.some(k => bio.includes(k) || name.includes(k));
 }
 
 function applyJaxFollowerFilter() {
@@ -6318,24 +6340,34 @@ async function loadJaxQueue() {
     const text = await res.text();
     if (text.includes('<!DOCTYPE') || text.includes('<html')) throw new Error('not-published');
     const rejected = JSON.parse(localStorage.getItem('jax_rejected') || '[]');
-    const { on: ffOn, min: ffMin, max: ffMax } = getJaxFollowerFilter();
+    const { on: ffOn, min: ffMin, max: ffMax, minLikes, acctType } = getJaxFollowerFilter();
     const allPending = parseJaxCSV(text).filter(r => (r.status === 'pending' || r.status === 'pending_review') && !rejected.includes(r.tweet_id));
     const hasFollowerData = allPending.some(r => r.follower_count || r.followers || r.follower_count_str || r.author_followers);
     const rows = allPending
       .filter(r => {
-        if (!ffOn) return true;
-        const rawFollowers = r.follower_count || r.followers || r.follower_count_str || r.author_followers || '';
-        if (rawFollowers) {
-          const fc = parseFollowerCount(rawFollowers);
-          return fc >= ffMin && fc <= ffMax;
+        // Follower count filter
+        if (ffOn) {
+          const rawFollowers = r.follower_count || r.followers || r.follower_count_str || r.author_followers || '';
+          if (rawFollowers) {
+            const fc = parseFollowerCount(rawFollowers);
+            if (fc < ffMin || fc > ffMax) return false;
+          }
         }
-        // No follower data in sheet: show all, engagement_score sort handles priority
+        // Min likes filter
+        const likes = parseInt(r.like_count || r.likes || r.favorite_count || 0);
+        if (likes < minLikes) return false;
+        // Account type filter
+        if (acctType === 'food' && !matchesFoodAccount(r)) return false;
+        if (acctType === 'marketing') {
+          const bio = (r.author_bio || r.bio || '').toLowerCase();
+          const marketingKws = ['marketing','growth','brand','agency','founder','entrepreneur','business','startup'];
+          if (!marketingKws.some(k => bio.includes(k))) return false;
+        }
         return true;
       })
       .sort((a, b) => {
         const scoreDiff = (parseInt(b.engagement_score) || 0) - (parseInt(a.engagement_score) || 0);
         if (scoreDiff !== 0) return scoreDiff;
-        // Secondary: newest created_at first
         return new Date(b.created_at || 0) - new Date(a.created_at || 0);
       });
     const warn = document.getElementById('jaxFollowerWarn');
@@ -6343,9 +6375,9 @@ async function loadJaxQueue() {
     recordJaxScan(allPending.length);
     if (rows.length === 0) {
       if (status) status.textContent = 'Queue is clear';
-      el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies. JAX will surface new opportunities on the next n8n scan.</div></div>';
+      el.innerHTML = '<div class="jax-empty"><div class="jax-empty-icon">✓</div><div style="font-weight:700;color:var(--muted);margin-bottom:6px;">Queue is clear</div><div style="font-size:12px;">No pending replies matching your filters. Try lowering the min likes or switching account type.</div></div>';
     } else {
-      if (status) status.textContent = rows.length + ' of ' + allPending.length + ' pending ' + (rows.length === 1 ? 'reply' : 'replies') + ' · sorted by engagement';
+      if (status) status.textContent = rows.length + ' of ' + allPending.length + ' pending · ' + minLikes + '+ likes · ' + (acctType === 'all' ? 'all accounts' : acctType === 'food' ? 'food & restaurant' : 'marketing & biz');
       el.innerHTML = rows.map((r, i) => renderJaxCard(r, i + 1, rows.length)).join('');
     }
   } catch(e) {
