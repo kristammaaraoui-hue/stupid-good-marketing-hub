@@ -6353,15 +6353,21 @@ async function loadJaxQueue() {
             if (fc < ffMin || fc > ffMax) return false;
           }
         }
-        // Min likes filter
-        const likes = parseInt(r.like_count || r.likes || r.favorite_count || 0);
-        if (likes < minLikes) return false;
-        // Account type filter
-        if (acctType === 'food' && !matchesFoodAccount(r)) return false;
-        if (acctType === 'marketing') {
-          const bio = (r.author_bio || r.bio || '').toLowerCase();
-          const marketingKws = ['marketing','growth','brand','agency','founder','entrepreneur','business','startup'];
-          if (!marketingKws.some(k => bio.includes(k))) return false;
+        // Min likes filter — only apply if sheet actually has like data
+        const rawLikes = r.like_count || r.likes || r.favorite_count || r.likes_count || '';
+        if (rawLikes !== '') {
+          const likes = parseInt(rawLikes) || 0;
+          if (likes < minLikes) return false;
+        }
+        // Account type filter — only apply if sheet has bio data
+        const hasBioData = !!(r.author_bio || r.bio || r.user_bio || r.author_description);
+        if (hasBioData) {
+          if (acctType === 'food' && !matchesFoodAccount(r)) return false;
+          if (acctType === 'marketing') {
+            const bio = (r.author_bio || r.bio || r.user_bio || r.author_description || '').toLowerCase();
+            const marketingKws = ['marketing','growth','brand','agency','founder','entrepreneur','business','startup'];
+            if (!marketingKws.some(k => bio.includes(k))) return false;
+          }
         }
         return true;
       })
