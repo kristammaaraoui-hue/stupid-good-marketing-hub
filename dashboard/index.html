@@ -6175,6 +6175,48 @@ function getJaxFollowerFilter() {
   return { on, min, max, minLikes, acctType };
 }
 
+// ── JAX CONTENT SAFETY FILTER ────────────────────────────────────────────────
+const JAX_BLOCKED_POLITICAL = [
+  'trump','biden','harris','maga','democrat','republican','gop','liberal','conservative',
+  'election','ballot','vote for','congress','senate','president','white house',
+  'pro-life','pro-choice','abortion','gun control','second amendment','nra',
+  'blm','antifa','january 6','impeach','supreme court','roe v wade'
+];
+const JAX_BLOCKED_HATE = [
+  'racist','white supremac','kkk','nazi','neo-nazi','antisemit','islamophob',
+  'n-word','slur','hate crime','ethnic cleansing','genocide','lynching',
+  'go back to','illegal alien','replace theory'
+];
+const JAX_BLOCKED_SEXUAL = [
+  'porn','onlyfans','nsfw','nude','naked','sex tape','explicit','adult content',
+  'horny','thirst trap','nudes','sexting','fetish','bdsm','xxx'
+];
+const JAX_BLOCKED_VIOLENT = [
+  'shoot','bomb threat','kill yourself','kys','suicide','self-harm','mass shooting',
+  'terrorist','jihad','threaten','doxx','swat'
+];
+
+function isContentSafe(row) {
+  const combined = [
+    row.tweet_text || '', row.tweet_author || '',
+    row.author_bio || row.bio || ''
+  ].join(' ').toLowerCase();
+
+  for (const term of JAX_BLOCKED_POLITICAL) {
+    if (combined.includes(term)) return false;
+  }
+  for (const term of JAX_BLOCKED_HATE) {
+    if (combined.includes(term)) return false;
+  }
+  for (const term of JAX_BLOCKED_SEXUAL) {
+    if (combined.includes(term)) return false;
+  }
+  for (const term of JAX_BLOCKED_VIOLENT) {
+    if (combined.includes(term)) return false;
+  }
+  return true;
+}
+
 const FOOD_ACCOUNT_KEYWORDS = [
   'restaurant','food','chef','foodie','culinary','bakery','café','cafe',
   'bar','bistro','eatery','kitchen','cook','bake','dining','hospitality',
@@ -6341,7 +6383,11 @@ async function loadJaxQueue() {
     if (text.includes('<!DOCTYPE') || text.includes('<html')) throw new Error('not-published');
     const rejected = JSON.parse(localStorage.getItem('jax_rejected') || '[]');
     const { on: ffOn, min: ffMin, max: ffMax, minLikes, acctType } = getJaxFollowerFilter();
-    const allPending = parseJaxCSV(text).filter(r => (r.status === 'pending' || r.status === 'pending_review') && !rejected.includes(r.tweet_id));
+    const allPending = parseJaxCSV(text).filter(r =>
+      (r.status === 'pending' || r.status === 'pending_review') &&
+      !rejected.includes(r.tweet_id) &&
+      isContentSafe(r)
+    );
     const hasFollowerData = allPending.some(r => r.follower_count || r.followers || r.follower_count_str || r.author_followers);
     const rows = allPending
       .filter(r => {
