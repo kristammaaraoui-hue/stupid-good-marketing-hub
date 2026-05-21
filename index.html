@@ -4763,6 +4763,7 @@ async function renderDraftOutput(brief, length='~800 words', format='How-To Guid
           <button class="bcbtn" id="blogEditBtn" onclick="openBlogEdit()">✎ Edit</button>
           <button class="bcbtn" onclick="navigator.clipboard.writeText(window._currentBlogFull||'');toast('Blog copied to clipboard','var(--yellow)')">⎘ Copy</button>
           <button class="bcbtn bcbtn-green" onclick="repurposeBlog('${title.replace(/'/g,"\\'").replace(/"/g,'\\"')}')">↗ Repurpose to Social</button>
+          <button class="bcbtn" id="blogPushPendingBtn" onclick="pushBlogToPending()" style="background:rgba(255,217,17,0.12);border-color:rgba(255,217,17,0.35);color:var(--yellow);">→ Push to Pending</button>
           <button class="bcbtn bcbtn-purple" onclick="publishBlog()">⬆ Publish to Blog</button>
         </div>
       </div>
@@ -4891,6 +4892,37 @@ function approveAllRepurpose() {
   if (count > 0) savePosts();
   updateStats();
   toast(`${count} posts added to queue`, 'var(--green)');
+}
+
+function pushBlogToPending() {
+  const content = window._currentBlogFull || '';
+  const titleEl = document.querySelector('#draftOutput .bc-title');
+  const title = titleEl ? titleEl.textContent.trim() : 'Blog Post';
+  if (!content) { toast('No blog to push — generate one first', 'var(--yellow)'); return; }
+
+  const now = new Date();
+  const uid = Date.now();
+  POSTS.push({
+    id: uid,
+    platform: 'blog',
+    type: 'Article',
+    content: sanitizeContent(title + '\n\n' + content),
+    status: 'pending',
+    pillar: 'Blog',
+    date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    day: now.toLocaleDateString('en-US', { weekday: 'long' }),
+    time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  });
+  savePosts([uid]);
+  updateStats();
+
+  // Update badge + button state on the card
+  const badge = document.querySelector('#draftOutput .sbadge');
+  if (badge) { badge.className = 'sbadge s-pending'; badge.textContent = 'Pending'; }
+  const pushBtn = document.getElementById('blogPushPendingBtn');
+  if (pushBtn) { pushBtn.textContent = '✓ In Queue'; pushBtn.disabled = true; pushBtn.style.opacity = '0.6'; }
+
+  toast('Blog pushed to pending queue', 'var(--yellow)');
 }
 
 function publishBlog() {
