@@ -8877,17 +8877,13 @@ function updateGraphicQAScore() {
   if (b) { b.style.opacity = checked===total?'1':'0.4'; b.style.pointerEvents = checked===total?'auto':'none'; }
 }
 
-function runBloggerQA(targetId, prefilledText) {
-  const text = prefilledText || (document.getElementById('bloggerQAInput')?.value||'').trim();
-  if (!text) { toast('Paste your blog draft first'); return; }
-  const out = document.getElementById(targetId || 'bloggerQAOutput');
-  out.innerHTML = '<div class="loading-wrap"><div class="spinner sp-y"></div><div class="ld-text">Running blog QA…</div></div>';
-  setTimeout(() => {
-    const lower = text.toLowerCase();
-    const words = text.split(/\s+/).filter(w=>w.length>0).length;
-    const lines = text.split('\n').filter(l=>l.trim());
-    const firstLine = lines[0]||'';
-    const checks = [
+function _runBlogChecks(text) {
+  const lower = text.toLowerCase();
+  const words = text.split(/\s+/).filter(w=>w.length>0).length;
+  const lines = text.split('\n').filter(l=>l.trim());
+  const firstLine = lines[0]||'';
+  return {
+    checks: [
       (()=>{ const ok=firstLine.length>20&&firstLine.length<120; const num=/\d/.test(firstLine); return {status:!ok?'fail':num?'pass':'warn',label:'Title is strong + scannable',detail:!ok?'Title too short or missing. Formula: [Number] + [Benefit] + [Context].':num?'Title has a number — proven to increase CTR.':'Good title but consider adding a number (e.g. "7 Reasons…").'}; })(),
       (()=>{ const first=text.slice(0,300); const ok=/\b(here|this|real|truth|secret|most|never|always|everyone|nobody|stop|start|honest)\b/i.test(first); return {status:ok?'pass':'warn',label:'Opening hook stops the scroll',detail:ok?'Opening paragraph has scroll-stopping language.':'Opening is too gentle. Lead with your most interesting claim.'}; })(),
       (()=>{ const ok=/^#+\s|^[A-Z][A-Z\s]{4,30}$/m.test(text)||/\n[A-Z][a-z].{10,50}\n/.test(text); return {status:words<400?'warn':ok?'pass':'warn',label:'Has section headers',detail:ok?'Structure looks good — headers aid scannability.':words<400?'Short draft — add headers if this becomes a full post.':'No headers detected. Add H2s every 300–400 words.'}; })(),
@@ -8896,13 +8892,57 @@ function runBloggerQA(targetId, prefilledText) {
       (()=>{ const ok=/\b(join|sign up|waitlist|try|link|subscribe|follow|learn more|get started|book|reserve|check out)\b/i.test(text); return {status:ok?'pass':'warn',label:'Has a CTA',detail:ok?'Call to action found.':'No clear CTA — every post should end with a next step for the reader.'}; })(),
       {status:'warn',label:'One-line test (manual)',detail:'Can you summarize this post in one sentence? If not, the focus may be too broad.'},
       qaCheckEmDash(text),
-    ];
-    const fails=checks.filter(c=>c.status==='fail').length;
-    const warns=checks.filter(c=>c.status==='warn').length;
-    const s=fails>0?'REWRITE':warns>2?'FIX':'PASS';
-    const sc=fails>0?'var(--red)':warns>2?'var(--yellow)':'var(--green)';
-    out.innerHTML = _qaResultCard(checks,firstLine.slice(0,55)+(firstLine.length>55?'…':''),`Blog style guide · ${words} words · 8 checks`,sc,s,'← Back to BLOGGER',`setDraftTab('write',document.getElementById('draft-tab-write'))`);
-  }, 900);
+    ],
+    words,
+    firstLine
+  };
+}
+
+async function runBloggerQA(targetId, prefilledText) {
+  const text = prefilledText || (document.getElementById('bloggerQAInput')?.value||'').trim();
+  if (!text) { toast('Paste your blog draft first'); return; }
+  const out = document.getElementById(targetId || 'bloggerQAOutput');
+  out.innerHTML = '<div class="loading-wrap"><div class="spinner sp-y"></div><div class="ld-text">Running blog QA…</div></div>';
+
+  await new Promise(r => setTimeout(r, 900));
+
+  const {checks, words, firstLine} = _runBlogChecks(text);
+  const fails = checks.filter(c=>c.status==='fail');
+  const warns = checks.filter(c=>c.status==='warn');
+
+  // AUTO-FIX: if any hard fails detected, send to Penn for targeted rewrite
+  if (fails.length > 0) {
+    const issues = fails.map(c => `- ${c.label}: ${c.detail}`).join('\n');
+    out.innerHTML = `<div class="loading-wrap"><div class="spinner sp-y"></div><div class="ld-text">Auto-fixing ${fails.length} issue${fails.length>1?'s':''}…</div></div>`;
+    try {
+      const fixed = await callClaude(
+        PENN_SYSTEM,
+        `Fix the following issues in this blog draft. Return ONLY the corrected full blog text — no labels, no explanations, no JSON.\n\nISSUES TO FIX:\n${issues}\n\nRULES:\n- Keep all existing content, structure, and length — only fix the listed issues\n- Replace any banned terms with brand-approved alternatives (lead positive, never fear-based)\n- Remove all em dashes (—), replace with commas or periods\n- If no CTA exists, add one at the end (e.g. "Join the Stupid Good AI waitlist — free, launching soon.")\n- If title is missing or too short, rewrite it using: [Number] + [Benefit] + [Context]\n\nORIGINAL BLOG:\n${text}`,
+        4000
+      );
+      // Update the live blog display
+      window._currentBlogFull = fixed;
+      const fullEl = document.getElementById('blogFullContent');
+      if (fullEl) fullEl.textContent = fixed;
+      const excerptEl = document.getElementById('blogExcerpt');
+      if (excerptEl) excerptEl.textContent = fixed.slice(0, 200) + '…';
+      // Re-run QA on fixed version to confirm
+      const {checks: fixedChecks, words: fw, firstLine: fl} = _runBlogChecks(fixed);
+      const ff = fixedChecks.filter(c=>c.status==='fail').length;
+      const fw2 = fixedChecks.filter(c=>c.status==='warn').length;
+      const s2 = ff>0?'REWRITE':fw2>2?'FIX':'PASS';
+      const sc2 = ff>0?'var(--red)':fw2>2?'var(--yellow)':'var(--green)';
+      out.innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--green);padding:8px 12px;background:rgba(0,209,145,0.08);border-radius:8px;margin-bottom:12px;">✓ Auto-fixed ${fails.length} issue${fails.length>1?'s':''} — blog updated above</div>` +
+        _qaResultCard(fixedChecks, fl.slice(0,55)+(fl.length>55?'…':''), `Blog style guide · ${fw} words · 8 checks`, sc2, s2, '← Back to BLOGGER', `setDraftTab('write',document.getElementById('draft-tab-write'))`);
+      return;
+    } catch(e) {
+      // Fall through to show original QA if auto-fix fails
+    }
+  }
+
+  const s = fails.length>0?'REWRITE':warns.length>2?'FIX':'PASS';
+  const sc = fails.length>0?'var(--red)':warns.length>2?'var(--yellow)':'var(--green)';
+  out.innerHTML = _qaResultCard(checks, firstLine.slice(0,55)+(firstLine.length>55?'…':''), `Blog style guide · ${words} words · 8 checks`, sc, s, '← Back to BLOGGER', `setDraftTab('write',document.getElementById('draft-tab-write'))`);
 }
 
 // renderEngageQA() removed — QA panel is now inline in engageView HTML (#jaxQAPanel)
