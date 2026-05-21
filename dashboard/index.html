@@ -4707,13 +4707,54 @@ Topics should be specific and actionable — things Stupid Good AI can write a p
   }
 }
 
+// Diverse fallback topic pool — used when user leaves the brief blank
+const PENN_TOPIC_POOL = [
+  { brief: 'Why your restaurant regulars stop coming back (and it has nothing to do with the food)', format: 'The Contrarian Take' },
+  { brief: 'The psychology behind how we actually choose where to eat', format: 'Deep Dive' },
+  { brief: 'NYC neighborhood-by-neighborhood: where to eat when you actually live there', format: 'City Guide' },
+  { brief: 'What makes a dinner spot "worth it" at every price point', format: 'Opinion Piece' },
+  { brief: 'The 5 types of group chat fights about where to eat (and how to win them)', format: 'List Post' },
+  { brief: 'Date night restaurant mistakes everyone makes and how to avoid them', format: 'How-To Guide' },
+  { brief: 'Why the best food recs come from people, not algorithms — and what that means for apps', format: 'Hot Take' },
+  { brief: 'The hidden cost of "fine I guess" restaurant choices', format: 'Opinion Piece' },
+  { brief: 'How Spotify changed what we expect from recommendations (and why food is next)', format: 'Trend Analysis' },
+  { brief: 'Why solo dining is having a moment and what restaurants are getting right about it', format: 'Trend Analysis' },
+  { brief: 'The real reason Yelp reviews stopped being useful', format: 'The Contrarian Take' },
+  { brief: 'NYC\'s most underrated food neighborhoods that locals actually eat in', format: 'City Guide' },
+  { brief: 'Why "best of" lists keep failing us — and what a smarter rec looks like', format: 'Opinion Piece' },
+  { brief: 'The art of the perfect second-date restaurant pick', format: 'How-To Guide' },
+  { brief: 'What chefs eat on their nights off — and what it tells us about great food', format: 'Industry Insider' },
+  { brief: 'Why decision fatigue is ruining dinner plans (science + real solutions)', format: 'Deep Dive' },
+  { brief: 'The difference between a good restaurant and a restaurant that\'s good for you specifically', format: 'Brand Story' },
+  { brief: 'How the "I know a place" person in every friend group actually thinks', format: 'Community' },
+  { brief: 'Why vibes matter more than stars when picking a restaurant', format: 'Hot Take' },
+  { brief: 'The lunch problem: why finding a great midday spot is harder than dinner and shouldn\'t be', format: 'Opinion Piece' },
+];
+
 async function generateDraft() {
   // Read selected topic chip + textarea — chip used as fallback if brief is empty
   const selectedChip = document.querySelector('#draftTabMain .chips .chip.on-y')?.dataset?.v || '';
   const typedBrief = document.getElementById('draftBrief').value.trim();
-  const brief = typedBrief || selectedChip || 'Brand blog post';
+
+  // If no brief given, pick a random unused topic from the pool
+  let brief, format;
+  if (typedBrief || selectedChip) {
+    brief  = typedBrief || selectedChip;
+    format = railState.df || 'How-To Guide';
+  } else {
+    const history = getPennHistory();
+    const usedBriefs = new Set(history.map(h => h.brief?.toLowerCase().slice(0, 40)));
+    const unused = PENN_TOPIC_POOL.filter(t => !usedBriefs.has(t.brief.toLowerCase().slice(0, 40)));
+    const pool = unused.length ? unused : PENN_TOPIC_POOL; // reset if all used
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    brief  = pick.brief;
+    format = railState.df || pick.format;
+    // Show user what Penn picked
+    const briefEl = document.getElementById('draftBrief');
+    if (briefEl) briefEl.value = brief;
+  }
+
   const length = railState.dl || '~800 words';
-  const format = railState.df || 'How-To Guide';
   const timestamp = new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
   savePennHistory(brief, format, timestamp);
   const out = document.getElementById('draftOutput');
@@ -4723,9 +4764,17 @@ async function generateDraft() {
 
 async function renderDraftOutput(brief, length='~800 words', format='How-To Guide') {
   try {
+    // Build "already covered" list from Penn history to prevent topic repetition
+    const history = getPennHistory();
+    const recentTitles = history.slice(0, 8).map(h => `- ${h.brief}`).join('\n');
+    const avoidClause = recentTitles
+      ? `\n\nIMPORTANT — topics already covered recently (pick a genuinely different angle, do NOT repeat these):\n${recentTitles}`
+      : '';
+
     const raw = await callClaude(
       PENN_SYSTEM,
-      `Write a ${format} blog post for Stupid Good AI about: ${brief}\n\nFormat your response as:\nTITLE: [title here]\nSECTIONS: [comma-separated section names]\nEXCERPT: [opening 2-3 sentences only]\nFULL: [full blog post]\n\nTarget length: ${length}.`
+      `Write a ${format} blog post for Stupid Good AI about: ${brief}${avoidClause}\n\nFormat your response as:\nTITLE: [title here]\nSECTIONS: [comma-separated section names]\nEXCERPT: [opening 2-3 sentences only]\nFULL: [full blog post]\n\nTarget length: ${length}.`,
+      4000
     );
 
     // Parse response
