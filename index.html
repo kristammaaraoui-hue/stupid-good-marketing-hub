@@ -1793,7 +1793,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <div id="jaxQAPanel" style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border);">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             <div style="font-size:13px;font-weight:700;">Reply QA</div>
-            <div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,40,31,0.1);color:var(--red);border:1px solid rgba(255,40,31,0.2);">6 checks</div>
+            <div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,40,31,0.1);color:var(--red);border:1px solid rgba(255,40,31,0.2);">7 checks</div>
             <div style="font-size:11px;color:var(--muted);">Paste any reply draft — checks tone, length, and brand voice before you post.</div>
           </div>
           <textarea id="engageQAInput" class="ws-ta" rows="3" placeholder="Paste a reply draft to check before posting…" style="border-color:rgba(255,40,31,0.2);margin-bottom:10px;"></textarea>
@@ -3833,7 +3833,7 @@ function runSimpleGenerate(brief, location='') {
 }
 
 function makeSinglePostCard(uid, p, txt, limits, typeLabel='') {
-  cardContents[uid] = { content: txt, platform: p };
+  cardContents[uid] = { content: sanitizeContent(txt), platform: p };
   const lim = limits[p] || 9999;
   const c = txt.length;
   const col = c > lim ? 'var(--red)' : c > lim*0.85 ? 'var(--yellow)' : 'var(--muted2)';
@@ -7539,6 +7539,28 @@ async function regenBlog() {
 
 const QA_BANNED_VOCAB = ['mid','broken','tired of','stop settling','game-changer','game changer','revolutionary','disruptive','seamless','leverage','synergy','pain point','hustle harder','supercharge'];
 const QA_FEAR_PHRASES = ["don't miss out","before it's too late","limited time","act now","you're missing out","wake up","stop wasting","are you making this mistake"];
+
+// Strip em dashes from any AI-generated string before display
+function sanitizeContent(text) {
+  if (!text) return text;
+  // Replace em dash variants with a comma or period depending on context
+  return text
+    .replace(/ — /g, ', ')   // mid-sentence: "great food — really" → "great food, really"
+    .replace(/— /g, '')       // leading: "— and also" → "and also"
+    .replace(/ —/g, '.')      // trailing: "that's it —" → "that's it."
+    .replace(/—/g, ', ');     // any remaining bare em dash
+}
+
+function qaCheckEmDash(text) {
+  const hasEmDash = /—/.test(text);
+  return {
+    status: hasEmDash ? 'fail' : 'pass',
+    label: 'No em dashes (—)',
+    detail: hasEmDash
+      ? 'Contains an em dash — remove it. Use a comma, period, or rewrite the sentence.'
+      : 'Clean — no em dashes found.'
+  };
+}
 const QA_STACKED_NEG  = ["not bad","not terrible","not the worst","isn't the worst","don't not","can't not"];
 const QA_CORP_SPEAK   = ['utilize','leverage','bandwidth','circle back','deep dive','move the needle','best-in-class','state-of-the-art'];
 
@@ -8766,12 +8788,13 @@ function runCopyQA() {
       (()=>{ return {status:chars<=280?'pass':chars<=2200?'warn':'fail',label:'Length appropriate for platform',detail:chars<=280?`${chars} chars — fits X/Twitter.`:chars<=2200?`${chars} chars — fine for Instagram, too long for X.`:`${chars} chars — very long. Consider trimming.`}; })(),
       (()=>{ const first=text.split(/[.!?\n]/)[0]||''; const ok=first.length>20; return {status:ok?'pass':'warn',label:'Strong opening hook',detail:ok?'Opening line is specific enough to stop a scroll.':'Opening may be too generic — start with your sharpest claim.'}; })(),
       (()=>{ const has=/\b(link|bio|waitlist|try|join|sign up|click|tap|dm|comment|share|repost|follow|check out)\b/i.test(text); return {status:has?'pass':'warn',label:'Has a CTA or next step',detail:has?'CTA detected.':'No clear CTA found — add a direction for the reader.'}; })(),
+      qaCheckEmDash(text),
     ];
     const fails=checks.filter(c=>c.status==='fail').length;
     const warns=checks.filter(c=>c.status==='warn').length;
     const s=fails>0?'REWRITE':warns>1?'FIX':'PASS';
     const sc=fails>0?'var(--red)':warns>1?'var(--yellow)':'var(--green)';
-    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Brand voice · 7 checks · ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`,sc,s,'← Back to COPY',`setCopyTab('generate',document.getElementById('copy-tab-generate'))`);
+    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Brand voice · 8 checks · ${new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`,sc,s,'← Back to COPY',`setCopyTab('generate',document.getElementById('copy-tab-generate'))`);
   }, 850);
 }
 
@@ -8834,12 +8857,13 @@ function runBloggerQA(targetId, prefilledText) {
       (()=>{ const f=QA_BANNED_VOCAB.filter(w=>lower.includes(w)); return {status:f.length?'fail':'pass',label:'Brand voice — no banned terms',detail:f.length?`Found: "${f.join('", "')}" — replace with brand-approved language.`:'No banned vocabulary detected.'}; })(),
       (()=>{ const ok=/\b(join|sign up|waitlist|try|link|subscribe|follow|learn more|get started|book|reserve|check out)\b/i.test(text); return {status:ok?'pass':'warn',label:'Has a CTA',detail:ok?'Call to action found.':'No clear CTA — every post should end with a next step for the reader.'}; })(),
       {status:'warn',label:'One-line test (manual)',detail:'Can you summarize this post in one sentence? If not, the focus may be too broad.'},
+      qaCheckEmDash(text),
     ];
     const fails=checks.filter(c=>c.status==='fail').length;
     const warns=checks.filter(c=>c.status==='warn').length;
     const s=fails>0?'REWRITE':warns>2?'FIX':'PASS';
     const sc=fails>0?'var(--red)':warns>2?'var(--yellow)':'var(--green)';
-    out.innerHTML = _qaResultCard(checks,firstLine.slice(0,55)+(firstLine.length>55?'…':''),`Blog style guide · ${words} words · 7 checks`,sc,s,'← Back to BLOGGER',`setDraftTab('write',document.getElementById('draft-tab-write'))`);
+    out.innerHTML = _qaResultCard(checks,firstLine.slice(0,55)+(firstLine.length>55?'…':''),`Blog style guide · ${words} words · 8 checks`,sc,s,'← Back to BLOGGER',`setDraftTab('write',document.getElementById('draft-tab-write'))`);
   }, 900);
 }
 
@@ -8864,12 +8888,13 @@ function runEngageQA() {
       {status:words<=60?'pass':words<=100?'warn':'fail',label:'Appropriate reply length',detail:words<=60?`${words} words — good.`:words<=100?`${words} words — slightly long, trim to under 60.`:`${words} words — too long for a social reply.`},
       (()=>{ const f=QA_BANNED_VOCAB.filter(w=>lower.includes(w)); return {status:f.length?'fail':'pass',label:'No banned vocabulary',detail:f.length?`Remove: "${f[0]}" — sounds like marketing copy, not a real person.`:'No banned phrases detected.'}; })(),
       {status:!formalFound?'pass':'warn',label:'"Would a friend say this?" test',detail:!formalFound?'Tone feels natural and conversational.':'Slightly formal — a real person wouldn\'t phrase it this way.'},
+      qaCheckEmDash(text),
     ];
     const fails=checks.filter(c=>c.status==='fail').length;
     const warns=checks.filter(c=>c.status==='warn').length;
     const s=fails>0?'REWRITE':warns>1?'FIX':'PASS';
     const sc=fails>0?'var(--red)':warns>1?'var(--yellow)':'var(--green)';
-    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Reply QA · ${words} words · 6 checks`,sc,s,'← Clear',`document.getElementById('engageQAInput').value='';document.getElementById('jaxQAOutput').innerHTML=''`);
+    out.innerHTML = _qaResultCard(checks,text.slice(0,60)+(text.length>60?'…':''),`Reply QA · ${words} words · 7 checks`,sc,s,'← Clear',`document.getElementById('engageQAInput').value='';document.getElementById('jaxQAOutput').innerHTML=''`);
   }, 800);
 }
 
