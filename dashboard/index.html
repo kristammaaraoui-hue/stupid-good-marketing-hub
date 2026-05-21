@@ -7397,100 +7397,207 @@ async function regenPost(uid, platform) {
   toast('Regenerated — save when ready');
 }
 
-// ── QUEUE CARD EDIT ───────────────────────────────────────────────────────────
+// ── QUEUE CARD EDIT (full modal) ──────────────────────────────────────────────
+
+let epImages   = [];
+let epDragIdx  = null;
+let epCurrentPostId = null;
 
 function openQueueEdit(postId) {
-  if (activeQueueEdit === postId) { closeQueueEdit(postId); return; }
-  if (activeQueueEdit) closeQueueEdit(activeQueueEdit);
-  activeQueueEdit = postId;
+  const post = POSTS.find(p => p.id == postId);
+  if (!post) return;
+  epCurrentPostId = postId;
 
-  const post   = POSTS.find(p => p.id == postId);
-  const card   = document.getElementById('qc-' + postId);
-  const bodyEl = document.getElementById('qcb-' + postId);
-  if (!post || !card || !bodyEl) return;
+  // Platform buttons — pre-select current platform
+  document.querySelectorAll('.ep-plat-btn').forEach(b => {
+    b.classList.toggle('ep-plat-on', b.dataset.p === post.platform);
+  });
 
-  bodyEl.style.display = 'none';
-  let editEl = document.getElementById('qce-' + postId);
-  if (!editEl) {
-    editEl = document.createElement('div');
-    editEl.id = 'qce-' + postId;
-    bodyEl.insertAdjacentElement('afterend', editEl);
+  // Content
+  document.getElementById('epCaption').value = post.content || '';
+
+  // Date
+  try {
+    const [mo, day] = post.date.split(' ');
+    const mi = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(mo);
+    document.getElementById('epDate').value = new Date(2026, mi, parseInt(day)).toISOString().split('T')[0];
+  } catch(e) { document.getElementById('epDate').value = ''; }
+
+  // Time
+  try {
+    const [tm, ap] = post.time.split(' ');
+    let [hh, mm] = tm.split(':');
+    hh = parseInt(hh);
+    if (ap === 'PM' && hh !== 12) hh += 12;
+    if (ap === 'AM' && hh === 12) hh = 0;
+    document.getElementById('epTime').value = String(hh).padStart(2,'0') + ':' + mm;
+  } catch(e) { document.getElementById('epTime').value = ''; }
+
+  // Status
+  document.getElementById('epStatus').value = post.status || 'pending';
+
+  // Images — seed from existing post data
+  epImages = [];
+  if (post.carouselImages && post.carouselImages.length) {
+    epImages = post.carouselImages.map(src => ({ dataUrl: src, name: 'image' }));
+  } else if (post.designUrl && post.designUrl.startsWith('data:')) {
+    epImages = [{ dataUrl: post.designUrl, name: 'image' }];
   }
-  editEl.style.display = 'block';
-  editEl.innerHTML = `
-    <textarea id="qcta-${postId}" class="ws-ta" style="font-size:12px;line-height:1.5;margin:6px 0;" rows="4">${post.content.replace(/</g,'&lt;')}</textarea>
-    <div style="display:flex;gap:8px;margin-bottom:8px;">
-      <div style="flex:1;">
-        <label style="font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);display:block;margin-bottom:4px;">Date</label>
-        <input type="date" id="qced-${postId}" class="ws-ta" style="font-size:11px;padding:6px 8px;cursor:pointer;" value="${(()=>{try{const[mo,d]=post.date.split(' ');const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(mo);return new Date(2026,m,parseInt(d)).toISOString().split('T')[0];}catch(e){return '';}})()}">
-      </div>
-      <div style="flex:1;">
-        <label style="font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted2);display:block;margin-bottom:4px;">Time</label>
-        <input type="time" id="qcet-${postId}" class="ws-ta" style="font-size:11px;padding:6px 8px;cursor:pointer;" value="${(()=>{try{const t=post.time;const[tm,ap]=t.split(' ');let[h,m]=tm.split(':');h=parseInt(h);if(ap==='PM'&&h!==12)h+=12;if(ap==='AM'&&h===12)h=0;return String(h).padStart(2,'0')+':'+m;}catch(e){return '';}})()}">
-      </div>
-    </div>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
-      <button class="ocbtn ocbtn-approve" onclick="saveQueueEdit('${postId}')">✓ Save</button>
-      <button class="ocbtn" id="qcrb-${postId}" onclick="regenQueuePost('${postId}','${post.platform}')">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
-        Regenerate
-      </button>
-      <button class="ocbtn" onclick="closeQueueEdit('${postId}')">Cancel</button>
-    </div>`;
-  card.style.borderColor = 'rgba(0,209,145,0.35)';
-  card.style.background = 'var(--card2)';
+  const urlInput = document.getElementById('epDesignUrl');
+  urlInput.value = (post.designUrl && !post.designUrl.startsWith('data:')) ? post.designUrl : '';
+  document.getElementById('epFileInput').value = '';
+  epRenderStrip();
+
+  document.getElementById('editPostModal').classList.add('active');
 }
 
+// Legacy closer — kept so any stale inline panel references don't crash
 function closeQueueEdit(postId) {
-  const card   = document.getElementById('qc-' + postId);
-  const bodyEl = document.getElementById('qcb-' + postId);
   const editEl = document.getElementById('qce-' + postId);
+  const bodyEl = document.getElementById('qcb-' + postId);
+  const card   = document.getElementById('qc-' + postId);
   if (bodyEl) bodyEl.style.display = '';
   if (editEl) { editEl.style.display = 'none'; editEl.innerHTML = ''; }
-  if (card) { card.style.borderColor = ''; card.style.background = ''; }
+  if (card)   { card.style.borderColor = ''; card.style.background = ''; }
   activeQueueEdit = null;
 }
 
-function saveQueueEdit(postId) {
-  const ta   = document.getElementById('qcta-' + postId);
-  const post = POSTS.find(p => p.id == postId);
-  if (!ta || !post) return;
-  post.content = ta.value;
-  const dateEl = document.getElementById('qced-' + postId);
-  if (dateEl && dateEl.value) {
-    const d = new Date(dateEl.value + 'T12:00:00');
-    const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const WDAY = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    post.date = MON[d.getMonth()] + ' ' + d.getDate();
-    post.day  = WDAY[d.getDay()];
-  }
-  const timeEl = document.getElementById('qcet-' + postId);
-  if (timeEl && timeEl.value) {
-    const [h, m] = timeEl.value.split(':');
-    const hr = parseInt(h);
-    const ampm = hr >= 12 ? 'PM' : 'AM';
-    const hr12 = hr % 12 || 12;
-    post.time = hr12 + ':' + m + ' ' + ampm;
-  }
-  closeQueueEdit(postId);
-  const bodyEl = document.getElementById('qcb-' + postId);
-  if (bodyEl) { bodyEl.textContent = post.content.replace(/\n/g,' '); bodyEl.style.display = ''; }
-  savePosts();
-  toast('Post updated');
+function closeEditPostModal() {
+  document.getElementById('editPostModal').classList.remove('active');
+  epCurrentPostId = null;
+  epImages = [];
 }
 
-async function regenQueuePost(postId, platform) {
-  const ta  = document.getElementById('qcta-' + postId);
-  const btn = document.getElementById('qcrb-' + postId);
+function epSetPlat(btn) {
+  btn.classList.toggle('ep-plat-on');
+  const sel = document.querySelectorAll('.ep-plat-btn.ep-plat-on');
+  if (sel.length === 0) btn.classList.add('ep-plat-on'); // keep at least one
+}
+
+function epHandleFiles(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  let loaded = 0;
+  arr.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      epImages.push({ dataUrl: e.target.result, name: file.name });
+      loaded++;
+      if (loaded === arr.length) epRenderStrip();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function epHandleDrop(e) {
+  e.preventDefault();
+  document.getElementById('epUploadZone').style.borderColor = '';
+  if (e.dataTransfer.files.length) epHandleFiles(e.dataTransfer.files);
+}
+
+function epRenderStrip() {
+  const strip = document.getElementById('epCarouselStrip');
+  if (!strip) return;
+  if (!epImages.length) { strip.style.display = 'none'; strip.innerHTML = ''; return; }
+  strip.style.display = 'flex';
+  strip.innerHTML = epImages.map((img, i) => `
+    <div draggable="true" ondragstart="epDragIdx=${i}" ondragover="event.preventDefault()" ondrop="epThumbDrop(event,${i})"
+      style="position:relative;flex-shrink:0;cursor:grab;">
+      <img src="${img.dataUrl}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;display:block;border:2px solid var(--border2);">
+      <div style="position:absolute;top:2px;left:4px;font-size:9px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.7);">${i+1}</div>
+      <button onclick="epRemoveImage(${i})" style="position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center;padding:0;">&times;</button>
+    </div>`).join('');
+}
+
+function epThumbDrop(e, toIdx) {
+  e.preventDefault();
+  if (epDragIdx === null || epDragIdx === toIdx) return;
+  const moved = epImages.splice(epDragIdx, 1)[0];
+  epImages.splice(toIdx, 0, moved);
+  epDragIdx = null;
+  epRenderStrip();
+}
+
+function epRemoveImage(idx) { epImages.splice(idx, 1); epRenderStrip(); }
+function epStripDrop(e) { e.preventDefault(); if (e.dataTransfer.files.length) epHandleFiles(e.dataTransfer.files); }
+
+function saveEditPost() {
+  if (!epCurrentPostId) return;
+  const post = POSTS.find(p => p.id == epCurrentPostId);
+  if (!post) return;
+
+  const caption = document.getElementById('epCaption').value.trim();
+  if (!caption) { toast('Caption can\'t be empty', 'var(--red)'); return; }
+
+  const selectedPlatforms = [...document.querySelectorAll('.ep-plat-btn.ep-plat-on')].map(b => b.dataset.p);
+  if (!selectedPlatforms.length) { toast('Select at least one platform', 'var(--red)'); return; }
+
+  const designUrl = epImages.length ? epImages[0].dataUrl : document.getElementById('epDesignUrl').value.trim();
+  const dateVal   = document.getElementById('epDate').value;
+  const timeVal   = document.getElementById('epTime').value;
+  const status    = document.getElementById('epStatus').value;
+
+  const d = dateVal ? new Date(dateVal + 'T12:00:00') : new Date();
+  const MON  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const WDAY = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dateStr = MON[d.getMonth()] + ' ' + d.getDate();
+  const dayStr  = WDAY[d.getDay()];
+  const [hStr, mStr] = (timeVal || '09:00').split(':');
+  const hr = parseInt(hStr);
+  const timeStr = (hr > 12 ? hr - 12 : hr || 12) + ':' + mStr + ' ' + (hr >= 12 ? 'PM' : 'AM');
+
+  // Update the original post
+  post.content  = caption;
+  post.platform = selectedPlatforms[0];
+  post.date     = dateStr;
+  post.day      = dayStr;
+  post.time     = timeStr;
+  post.status   = status;
+  if (epImages.length > 1) {
+    post.carouselImages = epImages.map(img => img.dataUrl);
+    post.designUrl = epImages[0].dataUrl;
+    post.type = 'Carousel';
+  } else if (designUrl) {
+    post.designUrl = designUrl;
+    delete post.carouselImages;
+    post.type = 'Post';
+  } else {
+    delete post.designUrl;
+    delete post.carouselImages;
+    post.type = post.type || 'Post';
+  }
+
+  // Extra platforms → create duplicate posts
+  if (selectedPlatforms.length > 1) {
+    selectedPlatforms.slice(1).forEach((platform, i) => {
+      const copy = Object.assign({}, post, { id: Date.now() + i + 1, platform });
+      if (post.carouselImages) copy.carouselImages = [...post.carouselImages];
+      POSTS.push(copy);
+    });
+  }
+
+  closeEditPostModal();
+  savePosts();
+  renderQueue();
+  if (typeof renderCalendar === 'function') renderCalendar();
+  const extra = selectedPlatforms.length > 1
+    ? ` + ${selectedPlatforms.length - 1} duplicate${selectedPlatforms.length > 2 ? 's' : ''} added`
+    : '';
+  toast('Post updated' + extra);
+}
+
+async function regenEditPost() {
+  const ta  = document.getElementById('epCaption');
+  const btn = document.getElementById('epRegenBtn');
   if (!ta) return;
-  const origHTML = btn ? btn.innerHTML : '';
+  const platform  = document.querySelector('.ep-plat-btn.ep-plat-on')?.dataset.p || 'instagram';
+  const origHTML  = btn ? btn.innerHTML : '';
   const currentText = ta.value.trim();
   ta.style.opacity = '0.4'; ta.disabled = true;
   if (btn) { btn.innerHTML = 'Regenerating…'; btn.disabled = true; }
   const platInstructions = {
     instagram: 'one flowing paragraph (no line breaks), ~200-320 characters. Specific details + punchy reaction + CTA ending "Link in bio."',
-    x: 'max 280 chars, sharp and direct, no hashtags',
-    tiktok: 'short caption under 150 chars, punchy, one clear take'
+    x:         'max 280 chars, sharp and direct, no hashtags',
+    tiktok:    'short caption under 150 chars, punchy, one clear take'
   };
   const instruction = platInstructions[platform] || platInstructions.x;
   try {
@@ -7498,8 +7605,6 @@ async function regenQueuePost(postId, platform) {
       `Rewrite this ${platLabel(platform)} post with a completely different angle, hook, and opening. Keep the same subject but use a fresh perspective.\n\nORIGINAL:\n${currentText}\n\n---\n\nFormat: ${instruction}\n\nReturn ONLY the post text, no labels or explanation.`
     );
     ta.value = result.trim();
-    const post = POSTS.find(p => p.id == postId);
-    if (post) { post.content = result.trim(); savePosts(); }
   } catch(e) {
     toast('Regen failed: ' + e.message, 'var(--red)');
   }
@@ -9334,9 +9439,98 @@ document.getElementById('blogPreviewModal')?.addEventListener('click', function(
   </div>
 </div>
 
+<!-- ── EDIT POST MODAL ─────────────────────────────────────────────────────── -->
+<div id="editPostModal" class="bpm-overlay" onclick="if(event.target===this)closeEditPostModal()">
+  <div style="background:var(--card);border-radius:18px;width:100%;max-width:520px;padding:28px 28px 24px;box-shadow:0 20px 60px rgba(0,0,0,0.4);display:flex;flex-direction:column;gap:18px;max-height:90vh;overflow-y:auto;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:16px;font-weight:800;">Edit Post</div>
+      <button onclick="closeEditPostModal()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:0;">&times;</button>
+    </div>
+
+    <!-- Platform -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Platform <span style="font-weight:400;text-transform:none;font-size:10px;">— select one or more · extra platforms create duplicate posts</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="ep-plat-btn" data-p="instagram" onclick="epSetPlat(this)">Instagram</button>
+        <button class="ep-plat-btn" data-p="x" onclick="epSetPlat(this)">X / Twitter</button>
+        <button class="ep-plat-btn" data-p="tiktok" onclick="epSetPlat(this)">TikTok</button>
+        <button class="ep-plat-btn" data-p="blog" onclick="epSetPlat(this)">Blog</button>
+      </div>
+    </div>
+
+    <!-- Caption -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Caption / Copy</div>
+      <textarea id="epCaption" rows="5" placeholder="Post content…" style="width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;"></textarea>
+      <div style="margin-top:7px;">
+        <button class="ocbtn" id="epRegenBtn" onclick="regenEditPost()" style="font-size:11px;">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+          Ask AI to Regenerate
+        </button>
+      </div>
+    </div>
+
+    <!-- Images -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">
+        Images <span style="font-weight:400;text-transform:none;font-size:10px;">— optional · drag to reorder · click × to remove</span>
+      </div>
+      <div id="epCarouselStrip" style="display:none;flex-wrap:wrap;gap:8px;margin-bottom:10px;" ondragover="event.preventDefault()" ondrop="epStripDrop(event)"></div>
+      <div id="epUploadZone" onclick="document.getElementById('epFileInput').click()"
+        style="border:2px dashed var(--border2);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:border-color 0.15s;"
+        ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+        ondragleave="this.style.borderColor=''"
+        ondrop="epHandleDrop(event)">
+        <input type="file" id="epFileInput" accept="image/*" multiple style="display:none" onchange="epHandleFiles(this.files)">
+        <div style="color:var(--muted);font-size:12px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:3px;display:block;margin-left:auto;margin-right:auto;opacity:0.5;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Click or drag to add / replace images
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:10px;color:var(--muted);">or paste a Canva / image URL</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+      <input id="epDesignUrl" type="url" placeholder="https://www.canva.com/design/…" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+    </div>
+
+    <!-- Date + Time -->
+    <div style="display:flex;gap:12px;">
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Date</div>
+        <input id="epDate" type="date" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Time</div>
+        <input id="epTime" type="time" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Status</div>
+      <select id="epStatus" style="padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;outline:none;width:100%;box-sizing:border-box;">
+        <option value="approved">Approved — ready to schedule</option>
+        <option value="pending">Pending — needs review</option>
+        <option value="draft">Draft</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;padding-top:4px;">
+      <button onclick="saveEditPost()" style="flex:1;padding:11px 0;border-radius:12px;background:var(--green);color:#fff;font-size:13px;font-weight:700;border:none;cursor:pointer;">Save Changes</button>
+      <button onclick="closeEditPostModal()" style="padding:11px 18px;border-radius:12px;background:var(--card2);color:var(--muted);font-size:13px;font-weight:600;border:1px solid var(--border2);cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <style>
 .ap-plat-btn { padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer; }
 .ap-plat-btn.ap-plat-on { background:rgba(0,209,145,0.12);color:var(--green);border-color:rgba(0,209,145,0.35); }
+.ep-plat-btn { padding:6px 14px;border-radius:20px;border:1px solid var(--border2);background:var(--card2);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer; }
+.ep-plat-btn.ep-plat-on { background:rgba(0,209,145,0.12);color:var(--green);border-color:rgba(0,209,145,0.35); }
 .cal-status-tab { display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;white-space:nowrap; }
 .cal-status-tab:hover { background:var(--card2);color:var(--text); }
 .cal-status-tab.on { background:var(--card);color:var(--text);border-color:var(--border2);box-shadow:var(--card-shadow); }
