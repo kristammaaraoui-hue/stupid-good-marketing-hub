@@ -1774,7 +1774,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
           <span style="font-size:11px;color:var(--muted);">–</span>
           <input type="number" id="jaxMaxFollowers" value="500000" min="0" style="width:80px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
           <span style="font-size:11px;color:var(--muted);margin-left:4px;">min likes:</span>
-          <input type="number" id="jaxMinLikes" value="100" min="0" style="width:60px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
+          <input type="number" id="jaxMinLikes" value="100" min="0" title="Filters by like_count if your sheet has it, otherwise uses engagement score as a proxy" style="width:60px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;" onchange="applyJaxFollowerFilter()">
           <span style="font-size:11px;color:var(--muted);">account type:</span>
           <select id="jaxAccountType" onchange="applyJaxFollowerFilter()" style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:11px;color:var(--text);outline:none;">
             <option value="all">All</option>
@@ -6431,11 +6431,17 @@ async function loadJaxQueue() {
             if (fc < ffMin || fc > ffMax) return false;
           }
         }
-        // Min likes filter — only apply if sheet actually has like data
+        // Min likes filter — use dedicated likes column if present, otherwise
+        // fall back to engagement_score (score ≈ likes × 3 in standard n8n formula)
         const rawLikes = r.like_count || r.likes || r.favorite_count || r.likes_count || '';
         if (rawLikes !== '') {
           const likes = parseInt(rawLikes) || 0;
           if (likes < minLikes) return false;
+        } else {
+          // No likes column — proxy via engagement_score
+          const score = parseInt(r.engagement_score) || 0;
+          const scoreThreshold = minLikes * 3;
+          if (score < scoreThreshold) return false;
         }
         // Account type filter — only apply if sheet has bio data
         const hasBioData = !!(r.author_bio || r.bio || r.user_bio || r.author_description);
