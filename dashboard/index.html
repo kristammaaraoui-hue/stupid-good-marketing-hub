@@ -6482,18 +6482,21 @@ async function loadJaxQueue() {
             if (fc < ffMin || fc > ffMax) return false;
           }
         }
-        // Min likes filter — use dedicated likes column if present, otherwise
-        // fall back to engagement_score (score ≈ likes × 3 in standard n8n formula)
+        // Min likes filter — only apply when the sheet actually has the data
+        // If neither likes nor engagement_score column exists, skip this filter
+        // (don't silently drop every tweet just because n8n didn't export those fields)
         const rawLikes = r.like_count || r.likes || r.favorite_count || r.likes_count || '';
+        const rawScore = r.engagement_score || '';
         if (rawLikes !== '') {
           const likes = parseInt(rawLikes) || 0;
           if (likes < minLikes) return false;
-        } else {
-          // No likes column — proxy via engagement_score
-          const score = parseInt(r.engagement_score) || 0;
+        } else if (rawScore !== '') {
+          // No likes column — proxy via engagement_score (score ≈ likes × 3)
+          const score = parseInt(rawScore) || 0;
           const scoreThreshold = minLikes * 3;
           if (score < scoreThreshold) return false;
         }
+        // If neither column is present in the sheet, skip the filter entirely
         // Account type filter — only apply if sheet has bio data
         const hasBioData = !!(r.author_bio || r.bio || r.user_bio || r.author_description);
         if (hasBioData) {
