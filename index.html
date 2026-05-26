@@ -1730,6 +1730,14 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         </div>
       </div>
       <div class="rail-sec">
+        <div class="rail-sec-title">Target Accounts</div>
+        <div id="jaxAccountList" style="padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto;"></div>
+        <div style="padding:4px 10px;display:flex;gap:4px;">
+          <input id="jaxAccountInput" type="text" placeholder="@handle" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:11.5px;color:var(--text);outline:none;" onkeydown="if(event.key==='Enter')addJaxAccount()">
+          <button class="rbtn" style="padding:5px 12px;color:var(--red);border-color:rgba(255,40,31,0.3);white-space:nowrap;" onclick="addJaxAccount()">+ Add</button>
+        </div>
+      </div>
+      <div class="rail-sec">
         <div class="rail-sec-title">Target Profile</div>
         <div style="padding:6px 10px;font-size:11px;color:var(--muted);line-height:1.7;">
           <div>👥 <strong style="color:var(--text);">Audience:</strong> Restaurant &amp; food biz owners</div>
@@ -3569,7 +3577,7 @@ function renderAuditResults(plat, liveData) {
 // connectReddit / connectDiscord removed — were fake setTimeout simulations.
 // Reddit and Discord will be wired through n8n when added. Fields save to localStorage.
 function goAgent(a) {
-  if (a === 'engage') { show('engageView'); initJaxFollowerFilter(); renderJaxKeywords(); loadJaxQueue(); return; }
+  if (a === 'engage') { show('engageView'); initJaxFollowerFilter(); renderJaxKeywords(); renderJaxAccounts(); loadJaxQueue(); return; }
   if (a === 'calendar') { renderCalendar(); show('calendarView'); return; }
   if (a === 'scout') { goScout(); return; }
   show(a+'View');
@@ -6216,7 +6224,7 @@ async function runEngageScan() {
     const resp = await fetch(JAX_SCAN_TRIGGER, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + JAX_AUTH },
-      body: JSON.stringify({ keywords, profile })
+      body: JSON.stringify({ keywords, profile, target_accounts: getJaxAccounts() })
     });
     if (resp.ok) {
       toast('Scan triggered — results will appear in 1–2 min', 'var(--red)');
@@ -6382,6 +6390,60 @@ function removeJaxKeyword(idx) {
   saveJaxKeywords(kws);
   renderJaxKeywords();
   toast('Keyword removed', 'var(--muted)');
+}
+
+// ── JAX TARGET ACCOUNTS ───────────────────────────────────────────────────────
+const JAX_DEFAULT_ACCOUNTS = [
+  // Food Media and Publications
+  'theinfatuation','eater','bonappetit','food52','grubstreet','seriouseats',
+  'nytfood','latimesfood','firstwefeast','thekitchn','saveur','foodandwine',
+  'zagat','michelinguide','eaterny',
+  // Food Critics and Writers
+  'saminnosrat','bittman','ottolenghi','francis_lam','plattypants',
+  'pete_wells','civileats',
+  // Chefs
+  'gordonramsay','chefludo','davidchang','tomcolicchio','josebeast','chefericripert',
+  // Food Culture
+  'tablehopper','infatuationnyc','opentable','yelp','resyos'
+];
+
+function getJaxAccounts() {
+  try {
+    const stored = localStorage.getItem('jax_target_accounts');
+    return stored ? JSON.parse(stored) : [...JAX_DEFAULT_ACCOUNTS];
+  } catch(e) { return [...JAX_DEFAULT_ACCOUNTS]; }
+}
+
+function saveJaxAccounts(accts) {
+  try { localStorage.setItem('jax_target_accounts', JSON.stringify(accts)); } catch(e) {}
+}
+
+function renderJaxAccounts() {
+  const el = document.getElementById('jaxAccountList');
+  if (!el) return;
+  const accts = getJaxAccounts();
+  el.innerHTML = accts.map((a, i) =>
+    `<span class="keyword-tag" style="cursor:default;">@${a}<span onclick="removeJaxAccount(${i})" style="margin-left:4px;cursor:pointer;color:var(--muted2);font-size:10px;" title="Remove">✕</span></span>`
+  ).join('');
+}
+
+function addJaxAccount() {
+  const inp = document.getElementById('jaxAccountInput');
+  if (!inp) return;
+  let val = inp.value.trim().replace(/^@/, '');
+  if (!val) return;
+  const accts = getJaxAccounts();
+  if (!accts.includes(val)) { accts.push(val); saveJaxAccounts(accts); renderJaxAccounts(); toast('Account added', 'var(--red)'); }
+  else { toast('Already watching that account', 'var(--muted)'); }
+  inp.value = '';
+}
+
+function removeJaxAccount(idx) {
+  const accts = getJaxAccounts();
+  accts.splice(idx, 1);
+  saveJaxAccounts(accts);
+  renderJaxAccounts();
+  toast('Account removed', 'var(--muted)');
 }
 
 // ── JAX TARGETING PROFILE ─────────────────────────────────────────────────────
