@@ -5438,6 +5438,25 @@ function markBlotatoSynced(id) {
 }
 function isBlotatoSynced(id) { return BLOTATO_SYNCED.has(String(id)); }
 
+// Snapshot captured when entering edit mode, used to detect changes on save
+let _preEditSnapshot = null;
+
+async function autoSyncToBlotato(post) {
+  const key = getBlotatoKey();
+  if (!key) { toast('Post saved. Add a Blotato key in Settings to enable auto-sync.', 'var(--yellow)'); return; }
+  const platform = post.platform === 'x' ? 'twitter' : post.platform;
+  const accountId = BLOTATO_ACCOUNTS[platform];
+  if (!accountId) { toast('Post saved. Platform not connected in Blotato.', 'var(--yellow)'); return; }
+  try {
+    const mediaUrls = await resolveMediaUrls(post);
+    await blotatoFetch(buildBlotatoPayload(post, accountId, platform, mediaUrls));
+    markBlotatoSynced(post.id);
+    toast('Post saved and re-synced to Blotato', 'var(--green)');
+  } catch(e) {
+    toast('Post saved locally. Blotato sync failed: ' + e.message, 'var(--red)');
+  }
+}
+
 async function blotatoFetch(payload) {
   console.log('[Blotato] Sending payload:', JSON.stringify(payload, null, 2));
   const res = await fetch(BLOTATO_PROXY, {
@@ -7243,6 +7262,15 @@ function closePostModal() {
 function openModalEdit(postId) {
   const post = POSTS.find(p => p.id == postId);
   if (!post) return;
+  // Capture snapshot before edits so saveModalEdit can detect what changed
+  _preEditSnapshot = {
+    content: post.content,
+    platform: post.platform,
+    date: post.date,
+    time: post.time,
+    image: post.image || null,
+    designUrl: post.designUrl || null
+  };
   const copyEl = document.getElementById('pmCopy');
   const actEl  = document.getElementById('pmActions');
   // Parse current date to ISO for input
@@ -7307,32 +7335,95 @@ function pmTogglePlat(p) {
 function saveModalEdit(postId) {
   const post = POSTS.find(p => p.id == postId);
   if (!post) return;
+
+  // Warn if post has already been published
+  if (post.status === 'delivered') {
+    toast('Heads up: this post has already been pushed out. Saving locally only.', '#ff9800');
+    const ta = document.getElementById('pmEditTa');
+    const dateEl = document.getElementById('pmEditDate');
+    const timeEl = document.getElementById('pmEditTime');
+    if (ta) post.content = ta.value.trim();
+    const activeBtnD = ['instagram','x','tiktok','blog'].find(pl => {
+      const btn = document.getElementById('pmEditPlat-' + pl);
+      return btn && btn.dataset.active === 'true';
+    });
+    if (activeBtnD) post.platform = activeBtnD;
+    if (dateEl && dateEl.value) {
+      const d = new Date(dateEl.value + 'T12:00:00');
+      post.date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      post.day  = d.toLocaleDateString('en-US', { weekday: 'long' });
+    }
+    if (timeEl && timeEl.value) {
+      const [h, m] = timeEl.value.split(':');
+      const hr = parseInt(h);
+      post.time = (hr > 12 ? hr - 12 : hr || 12) + ':' + m + ' ' + (hr >= 12 ? 'PM' : 'AM');
+    }
+    savePosts([post.id]);
+    renderQueue();
+    if (typeof renderCalendar === 'function') renderCalendar();
+    openPostModal(postId);
+    _preEditSnapshot = null;
+    return;
+  }
+
   const ta   = document.getElementById('pmEditTa');
   const dateEl = document.getElementById('pmEditDate');
   const timeEl = document.getElementById('pmEditTime');
   if (!ta) return;
-  post.content = ta.value.trim();
-  // Save platform if changed
+
+  // Read new values from form
+  const newContent = ta.value.trim();
   const activeBtn = ['instagram','x','tiktok','blog'].find(pl => {
     const btn = document.getElementById('pmEditPlat-' + pl);
     return btn && btn.dataset.active === 'true';
   });
-  if (activeBtn) post.platform = activeBtn;
+  const newPlatform = activeBtn || post.platform;
+
+  let newDate = post.date;
+  let newDay = post.day;
   if (dateEl && dateEl.value) {
     const d = new Date(dateEl.value + 'T12:00:00');
-    post.date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    post.day  = d.toLocaleDateString('en-US', { weekday: 'long' });
+    newDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    newDay  = d.toLocaleDateString('en-US', { weekday: 'long' });
   }
+  let newTime = post.time;
   if (timeEl && timeEl.value) {
     const [h, m] = timeEl.value.split(':');
     const hr = parseInt(h);
-    post.time = (hr > 12 ? hr - 12 : hr || 12) + ':' + m + ' ' + (hr >= 12 ? 'PM' : 'AM');
+    newTime = (hr > 12 ? hr - 12 : hr || 12) + ':' + m + ' ' + (hr >= 12 ? 'PM' : 'AM');
   }
+
+  // Detect whether anything changed vs the snapshot taken when edit opened
+  const snap = _preEditSnapshot;
+  const changed = snap && (
+    newContent !== snap.content ||
+    newPlatform !== snap.platform ||
+    newDate !== snap.date ||
+    newTime !== snap.time ||
+    (post.image || null) !== snap.image ||
+    (post.designUrl || null) !== snap.designUrl
+  );
+
+  // Apply edits to post object
+  post.content  = newContent;
+  post.platform = newPlatform;
+  post.date     = newDate;
+  post.day      = newDay;
+  post.time     = newTime;
+
   savePosts([post.id]);
   renderQueue();
   if (typeof renderCalendar === 'function') renderCalendar();
   openPostModal(postId);
-  toast('Post saved', 'var(--green)');
+  _preEditSnapshot = null;
+
+  // Auto-sync to Blotato only for approved/scheduled posts that were already synced
+  const eligibleStatuses = post.status === 'approved' || post.status === 'scheduled';
+  if (eligibleStatuses && isBlotatoSynced(post.id) && changed) {
+    autoSyncToBlotato(post);
+  } else {
+    toast('Post saved', 'var(--green)');
+  }
 }
 
 async function resolveMediaUrls(post) {
