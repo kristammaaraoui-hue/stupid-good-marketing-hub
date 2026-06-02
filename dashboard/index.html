@@ -1852,6 +1852,10 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-seri
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export by Platform
       </button>
+      <button class="btn-sm" onclick="exportCombinedCalendar()" style="background:rgba(0,209,145,0.1);border-color:rgba(0,209,145,0.35);color:var(--green);font-weight:700;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Combined
+      </button>
     </div>
   </div>
 
@@ -6711,6 +6715,138 @@ function exportCalendarByPlatform() {
 
   XLSX.writeFile(wb, 'StupidGoodAI_ContentCalendar_Jun3_Forward.xlsx');
   toast('Exported! Check your downloads folder.', 'var(--green)');
+}
+
+function exportCombinedCalendar() {
+  if (typeof XLSX === 'undefined') { toast('Export library not loaded yet — try again in a moment', 'var(--yellow)'); return; }
+
+  const cutoff = new Date(2026, 5, 3, 0, 0, 0);
+  const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+
+  function parsePostDate(post) {
+    try { const [mo,d] = post.date.split(' '); return new Date(2026, MONTHS[mo], parseInt(d)); } catch(e) { return null; }
+  }
+
+  function getImageField(post) {
+    if (post.carouselImages && post.carouselImages.length) {
+      const urls = post.carouselImages.filter(u => u && !u.startsWith('data:'));
+      return urls.length ? urls.join(', ') : 'Carousel image (local only)';
+    }
+    if (post.designUrl) return post.designUrl.startsWith('data:') ? 'Image (local only)' : post.designUrl;
+    if (post.image) return post.image.startsWith('data:') ? 'Image (local only)' : post.image;
+    return '';
+  }
+
+  function capStatus(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+
+  // All posts June 3+
+  const future = POSTS.filter(p => { const dt = parsePostDate(p); return dt && dt >= cutoff; });
+
+  // Group by exact content string to identify cross-platform sets
+  const byContent = {};
+  future.forEach(p => {
+    const key = p.content.trim();
+    if (!byContent[key]) byContent[key] = [];
+    byContent[key].push(p);
+  });
+
+  // Cross-platform groups: same content on 2+ platforms where at least one is instagram or tiktok
+  const crossGroups = Object.values(byContent).filter(grp => {
+    const plats = new Set(grp.map(p => p.platform));
+    return plats.size > 1 && (plats.has('instagram') || plats.has('tiktok'));
+  });
+
+  // Track which content strings are in a cross-platform group
+  const crossContentKeys = new Set(crossGroups.map(g => g[0].content.trim()));
+
+  // X-only posts: platform x, content not in any cross-platform group
+  const xOnly = future.filter(p => p.platform === 'x' && !crossContentKeys.has(p.content.trim()));
+
+  // Sort cross groups by date
+  crossGroups.sort((a, b) => {
+    const da = parsePostDate(a[0]), db = parsePostDate(b[0]);
+    return (da || 0) - (db || 0);
+  });
+
+  // Sort x-only by date then time
+  xOnly.sort((a, b) => {
+    const da = parsePostDate(a), db = parsePostDate(b);
+    if ((da || 0) !== (db || 0)) return (da || 0) - (db || 0);
+    return (a.time || '').localeCompare(b.time || '');
+  });
+
+  const wb = XLSX.utils.book_new();
+
+  // SHEET 1: Cross-Platform Combined
+  // One row per content group — Instagram / X / TikTok columns side by side
+  const sheet1Rows = [['Date','Day','Caption / Content','Image','Instagram Time','Instagram Status','X Time','X Status','TikTok Time','TikTok Status']];
+
+  crossGroups.forEach(grp => {
+    const ig     = grp.find(p => p.platform === 'instagram');
+    const xPost  = grp.find(p => p.platform === 'x');
+    const tt     = grp.find(p => p.platform === 'tiktok');
+    const anchor = ig || xPost || tt;
+    const img    = getImageField(ig || xPost || tt || grp[0]);
+    sheet1Rows.push([
+      anchor.date || '',
+      anchor.day  || '',
+      anchor.content || '',
+      img,
+      ig    ? ig.time    : '',
+      ig    ? capStatus(ig.status)    : '',
+      xPost ? xPost.time : '',
+      xPost ? capStatus(xPost.status) : '',
+      tt    ? tt.time    : '',
+      tt    ? capStatus(tt.status)    : '',
+    ]);
+  });
+
+  const ws1 = XLSX.utils.aoa_to_sheet(sheet1Rows);
+  ws1['!cols'] = [
+    { wch: 10 }, // Date
+    { wch: 10 }, // Day
+    { wch: 65 }, // Caption
+    { wch: 40 }, // Image
+    { wch: 16 }, // IG Time
+    { wch: 14 }, // IG Status
+    { wch: 14 }, // X Time
+    { wch: 12 }, // X Status
+    { wch: 16 }, // TT Time
+    { wch: 14 }, // TT Status
+  ];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Cross-Platform Posts');
+
+  // SHEET 2: X Additional Posts
+  const sheet2Rows = [['Date','Day','Time','Type','Pillar','Caption / Content','Image','Status']];
+
+  xOnly.forEach(p => {
+    sheet2Rows.push([
+      p.date    || '',
+      p.day     || '',
+      p.time    || '',
+      p.type    || 'Post',
+      p.pillar  || '',
+      p.content || '',
+      getImageField(p),
+      capStatus(p.status),
+    ]);
+  });
+
+  const ws2 = XLSX.utils.aoa_to_sheet(sheet2Rows);
+  ws2['!cols'] = [
+    { wch: 10 }, // Date
+    { wch: 10 }, // Day
+    { wch: 10 }, // Time
+    { wch: 10 }, // Type
+    { wch: 18 }, // Pillar
+    { wch: 65 }, // Caption
+    { wch: 40 }, // Image
+    { wch: 12 }, // Status
+  ];
+  XLSX.utils.book_append_sheet(wb, ws2, 'X Additional Posts');
+
+  XLSX.writeFile(wb, 'StupidGoodAI_Combined_Calendar_Jun3_Forward.xlsx');
+  toast('Exported: ' + crossGroups.length + ' combined groups + ' + xOnly.length + ' X posts.', 'var(--green)');
 }
 
 function exportJaxCSV() {
