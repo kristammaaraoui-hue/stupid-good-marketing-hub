@@ -6306,26 +6306,43 @@ const JAX_BLOCKED_POLITICAL = [
   'trump','biden','harris','maga','democrat','republican','gop','liberal','conservative',
   'election','ballot','vote for','congress','senate','president','white house',
   'pro-life','pro-choice','abortion','gun control','second amendment','nra',
-  'blm','antifa','january 6','impeach','supreme court','roe v wade'
+  'blm','antifa','january 6','impeach','supreme court','roe v wade',
+  'woke','cancel culture','leftist','socialism','marxism','communis',
+  'rally','protest march','political party','deep state','fake news',
+  'far right','far left','alt-right','alt right','proud boys','oath keeper'
 ];
 const JAX_BLOCKED_HATE = [
   'racist','white supremac','kkk','nazi','neo-nazi','antisemit','islamophob',
   'n-word','slur','hate crime','ethnic cleansing','genocide','lynching',
-  'go back to','illegal alien','replace theory'
+  'go back to','illegal alien','replace theory','great replacement',
+  'homophob','transphob','misogyn','sexist','bigot'
 ];
 const JAX_BLOCKED_SEXUAL = [
-  'porn','onlyfans','nsfw','nude','naked','sex tape','explicit','adult content',
-  'horny','thirst trap','nudes','sexting','fetish','bdsm','xxx'
+  'porn','onlyfans','only fans','nsfw','nude','naked','sex tape','explicit','adult content',
+  'horny','thirst trap','nudes','sexting','fetish','bdsm','xxx',
+  'escort','sugar daddy','sugar baby','cam girl','cam boy','camgirl',
+  '18+','18 plus','adult site','adult model','sex work','stripper','strip club',
+  'lingerie model','hookup','one night stand'
 ];
 const JAX_BLOCKED_VIOLENT = [
-  'shoot','bomb threat','kill yourself','kys','suicide','self-harm','mass shooting',
-  'terrorist','jihad','threaten','doxx','swat'
+  'bomb threat','kill yourself','kys','suicide','self-harm','mass shooting',
+  'terrorist','jihad','doxx','swatting',
+  'i will kill','gonna kill','shoot up','shooting spree','school shooting',
+  'stab','punch','beat up','threaten to'
+];
+const JAX_BLOCKED_SPAM = [
+  'follow back','f4f','follow4follow','dm for promo','buy followers',
+  'click here to win','free money','make money fast','work from home earn',
+  'crypto signal','nft drop','airdrop','invest now','100x gains',
+  'onlyfans link','link in bio for adult'
 ];
 
 function isContentSafe(row) {
+  // Pull all text fields, including all known bio field name variations n8n may send
   const combined = [
-    row.tweet_text || '', row.tweet_author || '',
-    row.author_bio || row.bio || ''
+    row.tweet_text || '',
+    row.tweet_author || '',
+    row.author_bio || row.bio || row.user_bio || row.author_description || row.description || ''
   ].join(' ').toLowerCase();
 
   for (const term of JAX_BLOCKED_POLITICAL) {
@@ -6338,6 +6355,9 @@ function isContentSafe(row) {
     if (combined.includes(term)) return false;
   }
   for (const term of JAX_BLOCKED_VIOLENT) {
+    if (combined.includes(term)) return false;
+  }
+  for (const term of JAX_BLOCKED_SPAM) {
     if (combined.includes(term)) return false;
   }
   return true;
