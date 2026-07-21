@@ -5193,14 +5193,28 @@ function apStripDrop(e) {
 function closeAddPostModal() { document.getElementById('addPostModal').classList.remove('active'); }
 function apSetPlat(btn) {
   btn.classList.toggle('ap-plat-on');
-  // ensure at least one is always selected
   const selected = document.querySelectorAll('.ap-plat-btn.ap-plat-on');
   if (selected.length === 0) btn.classList.add('ap-plat-on');
+  apUpdateCharCount();
+}
+
+function apUpdateCharCount() {
+  const el = document.getElementById('apCharCount');
+  if (!el) return;
+  const xSelected = !!document.querySelector('.ap-plat-btn.ap-plat-on[data-p="x"]');
+  if (!xSelected) { el.style.display = 'none'; return; }
+  const len = (document.getElementById('apCaption').value || '').length;
+  const over = len > 280;
+  const near = len > 238;
+  el.style.display = 'block';
+  el.style.color = over ? 'var(--red)' : near ? 'var(--yellow)' : 'var(--muted)';
+  el.textContent = len + ' / 280' + (over ? '  — over limit for X' : '');
 }
 function submitManualPost() {
   const caption = document.getElementById('apCaption').value.trim();
   if (!caption) { toast('Add a caption first', 'var(--red)'); return; }
   const platforms = [...document.querySelectorAll('.ap-plat-btn.ap-plat-on')].map(b => b.dataset.p);
+  if (platforms.includes('x') && caption.length > 280) { toast('X / Twitter caption is over 280 characters. Trim it before saving.', 'var(--red)'); return; }
   if (!platforms.length) { toast('Select at least one platform', 'var(--red)'); return; }
   const designUrl = apImages.length ? apImages[0].dataUrl : document.getElementById('apDesignUrl').value.trim();
   const dateVal = document.getElementById('apDate').value;
@@ -9850,7 +9864,8 @@ document.getElementById('blogPreviewModal')?.addEventListener('click', function(
     <!-- Caption -->
     <div>
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Caption / Copy</div>
-      <textarea id="apCaption" rows="5" placeholder="Paste your caption here…" style="width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;"></textarea>
+      <textarea id="apCaption" rows="5" placeholder="Paste your caption here…" oninput="apUpdateCharCount()" style="width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;background:var(--card2);color:var(--text);font-size:13px;resize:vertical;outline:none;font-family:inherit;box-sizing:border-box;"></textarea>
+      <div id="apCharCount" style="display:none;font-size:11px;font-weight:700;text-align:right;margin-top:4px;"></div>
     </div>
 
     <!-- Design -->
