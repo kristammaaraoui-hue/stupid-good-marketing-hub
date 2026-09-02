@@ -2384,6 +2384,7 @@ async function loadPostsFromSupabase() {
   document.body.appendChild(syncBadge);
   try {
     const PAGE = 100;
+    const allRows = [];
     let from = 0, done = false, totalLoaded = 0;
     while (!done) {
       const { data, error } = await sbClient.from('posts').select('*').range(from, from + PAGE - 1);
@@ -2413,6 +2414,7 @@ async function loadPostsFromSupabase() {
         };
         if (existing >= 0) { POSTS[existing] = post; } else { POSTS.push(post); }
       });
+      allRows.push(...data);
       totalLoaded += data.length;
       syncBadge.textContent = 'Syncing… ' + totalLoaded + ' posts';
       if (data.length < PAGE) { done = true; } else { from += PAGE; await new Promise(r => setTimeout(r, 150)); }
@@ -7283,7 +7285,7 @@ function renderWeekView() {
             <div class="cal-pill-top">
               ${platBadge(p.platform, 14)}
               <span class="cal-pill-time">${p.time.replace(' AM','a').replace(' PM','p')}</span>
-              <span class="cal-pill-dot" style="background:${stColor[p.status]||'var(--muted2)'};" title="${p.status}"></span>
+              <span class="cal-pill-dot" style="background:${isBlotatoSynced(p.id) ? 'var(--green)' : (stColor[p.status]||'var(--muted2)')};" title="${isBlotatoSynced(p.id) ? 'Synced to Blotato · ' + p.status : p.status}"></span>
             </div>
             <div class="cal-pill-preview">${p.content.replace(/\n/g,' ').substring(0,55)}${p.content.length>55?'…':''}</div>
           </div>`).join('') : `<div style="font-size:10px;color:var(--muted2);text-align:center;padding:14px 4px;opacity:0.4;">—</div>`}
