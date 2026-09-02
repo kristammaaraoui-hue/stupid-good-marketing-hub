@@ -2524,7 +2524,14 @@ function savePosts(changedIds) {
   try {
     slim = POSTS.map(function(p) {
       var out = Object.assign({}, p);
-      if (out.carouselImages) delete out.carouselImages;
+      // Drop only base64 blobs (they blow the ~5MB quota). Uploaded http URLs are
+      // small and must persist, or the image is lost on the next reload.
+      if (out.carouselImages) {
+        var keepImgs = out.carouselImages.filter(function(u) {
+          return typeof u === 'string' && u.indexOf('data:') !== 0;
+        });
+        if (keepImgs.length) { out.carouselImages = keepImgs; } else { delete out.carouselImages; }
+      }
       if (out.designUrl && out.designUrl.startsWith('data:')) delete out.designUrl;
       return out;
     });
@@ -5654,8 +5661,16 @@ async function scheduleToBlotato(uid) {
       postText = postText.replace(/\[HOOK\]\s*/gi, '').replace(/\[BODY\]\s*/gi, '').replace(/\[CTA\]\s*/gi, '').trim();
     }
     const scheduledTime = buildScheduledDate(card);
-    const content = { text: postText, platform, mediaUrls: [] };
-    if (platform === 'instagram') { content.mediaType = 'reel'; }
+    // Was hardcoded to [], so this path could never attach an image.
+    const qPostForMedia = POSTS.find(p => p.id == uid);
+    const mediaUrls = qPostForMedia ? await resolveMediaUrls(qPostForMedia) : [];
+    const content = { text: postText, platform, mediaUrls };
+    // 'reel' only applies to video. Forcing it on a still image or a multi-image
+    // carousel makes Instagram reject the post.
+    const igSingle = mediaUrls.length === 1 ? mediaUrls[0] : null;
+    if (platform === 'instagram' && igSingle && /\.(mp4|mov|m4v|webm)(\?|$)/i.test(igSingle)) {
+      content.mediaType = 'reel';
+    }
     if (platform === 'tiktok') {
       Object.assign(content, { privacyLevel: 'PUBLIC_TO_EVERYONE', disabledComments: false, disabledDuet: false, disabledStitch: false, isBrandedContent: false, isYourBrand: true, isAiGenerated: true });
     }
@@ -7745,34 +7760,51 @@ function saveModalEdit(postId) {
   }
 }
 
-async function resolveMediaUrls(post) {
-  const src = post.designUrl || post.image || null;
-  if (!src) return [];
-  if (src.startsWith('http')) return [src];
-  if (src.startsWith('data:')) {
-    try {
-      const mimeType = src.match(/:(.*?);/)[1];
-      const byteString = atob(src.split(',')[1]);
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      const blob = new Blob([ab], { type: mimeType });
-      const ext = mimeType.split('/')[1] || 'png';
-      const filename = 'post-' + post.id + '-' + Date.now() + '.' + ext;
-      const uploadRes = await fetch(SB_URL + '/storage/v1/object/post-images/' + filename, {
-        method: 'POST',
-        headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': mimeType, 'x-upsert': 'true' },
-        body: blob
-      });
-      if (uploadRes.ok) {
-        const publicUrl = SB_URL + '/storage/v1/object/public/post-images/' + filename;
-        post.designUrl = publicUrl;
-        savePosts([post.id]);
-        return [publicUrl];
-      }
-    } catch(e) { /* skip image on error */ }
+async function uploadDataUrlToPostImages(dataUrl, postId, idx) {
+  const mimeType = (dataUrl.match(/:(.*?);/) || [])[1] || 'image/png';
+  const byteString = atob(dataUrl.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  const blob = new Blob([ab], { type: mimeType });
+  const ext = (mimeType.split('/')[1] || 'png').split('+')[0];
+  const filename = 'post-' + postId + '-' + idx + '-' + Date.now() + '.' + ext;
+  const res = await fetch(SB_URL + '/storage/v1/object/post-images/' + filename, {
+    method: 'POST',
+    headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': mimeType, 'x-upsert': 'true' },
+    body: blob
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error('image upload failed (' + res.status + ') ' + detail.slice(0, 120));
   }
-  return [];
+  return SB_URL + '/storage/v1/object/public/post-images/' + filename;
+}
+
+// Every public image URL for a post. Carousels live in post.carouselImages, single
+// images in designUrl/image. Anything still a data: URI is uploaded to storage first,
+// because Blotato needs a URL it can fetch.
+// Throws when a post HAS an image that cannot be resolved: posting media-less would
+// silently drop the image on X and be rejected outright by Instagram and TikTok.
+async function resolveMediaUrls(post) {
+  const sources = (post.carouselImages && post.carouselImages.length)
+    ? post.carouselImages.slice()
+    : [post.designUrl || post.image].filter(Boolean);
+  if (!sources.length) return []; // genuine text-only post
+
+  const urls = [];
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    if (typeof src !== 'string') continue;
+    if (src.indexOf('http') === 0) { urls.push(src); continue; }
+    if (src.indexOf('data:') === 0) { urls.push(await uploadDataUrlToPostImages(src, post.id, i)); }
+  }
+  if (!urls.length) throw new Error('this post has an image but no usable file left, re-attach it and try again');
+
+  if (post.carouselImages && post.carouselImages.length) post.carouselImages = urls;
+  else post.designUrl = urls[0];
+  savePosts([post.id]);
+  return urls;
 }
 
 function buildScheduledDate(post) {
@@ -7809,7 +7841,12 @@ function autoMarkDelivered() {
 function buildBlotatoPayload(post, accountId, platform, mediaUrls = []) {
   const scheduledTime = buildScheduledDate(post);
   const content = { text: post.content, platform, mediaUrls };
-  if (platform === 'instagram') { content.mediaType = 'reel'; }
+  // 'reel' only applies to video. Forcing it on a still image or a multi-image
+  // carousel makes Instagram reject the post.
+  const igSingle = mediaUrls.length === 1 ? mediaUrls[0] : null;
+  if (platform === 'instagram' && igSingle && /\.(mp4|mov|m4v|webm)(\?|$)/i.test(igSingle)) {
+    content.mediaType = 'reel';
+  }
   const target = { targetType: platform };
   if (platform === 'tiktok') {
     Object.assign(target, {
