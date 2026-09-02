@@ -2897,16 +2897,41 @@ const SEPT2026_X = [
   {d:"Sep 30",w:"Wednesday",t:"3:00 PM",p:"Hot Take",c:"The list you write in October is the one you actually finish.\nSummer lists are aspirational. Fall lists get done."},
   {d:"Sep 30",w:"Wednesday",t:"6:00 PM",p:"CTA",c:"Life's too short for pretty good.\nStupid Good AI launches soon and it's free for everyone.\nJoin the waitlist tonight. Link in bio."},
 ];
+// Slots already held by earlier hand-scheduled posts. These three were left to the
+// existing Aspen / waitlist / Miami tweets, so they are NOT queued in Blotato.
+const SEPT2026_UNQUEUED = ['Sep 3|12:00 PM', 'Sep 3|6:00 PM', 'Sep 4|9:00 AM'];
 (function seedSept2026X() {
-  if (POSTS.some(p => String(p.id).indexOf('sep26-') === 0)) return; // already seeded
-  SEPT2026_X.forEach((r, i) => {
-    POSTS.push({
-      id: 'sep26-' + (i + 1),
-      day: r.w, date: r.d, platform: 'x', type: 'Post',
-      time: r.t, status: 'draft', pillar: r.p, content: r.c
+  const seeded = POSTS.some(p => String(p.id).indexOf('sep26-') === 0);
+  if (!seeded) {
+    SEPT2026_X.forEach((r, i) => {
+      POSTS.push({
+        id: 'sep26-' + (i + 1),
+        day: r.w, date: r.d, platform: 'x', type: 'Post',
+        time: r.t, status: 'approved', pillar: r.p, content: r.c
+      });
     });
-  });
-  savePosts(); // writes localStorage + upserts the new rows to Supabase
+  } else {
+    // Already seeded as drafts on an earlier load — promote them in place.
+    POSTS.forEach(p => {
+      if (String(p.id).indexOf('sep26-') === 0 && p.status === 'draft') p.status = 'approved';
+    });
+  }
+  // These 101 are already live in Blotato (scheduled directly), so mark them synced
+  // to keep 'Schedule All via Blotato' from queuing a second copy of each.
+  // Written straight to the backing key: BLOTATO_SYNCED is a const declared further
+  // down this script, so calling markBlotatoSynced() here would hit its temporal dead
+  // zone. Seeding the key first means that Set picks these up when it initializes.
+  try {
+    const syncedKey = 'sg_blotato_synced';
+    const already = new Set(JSON.parse(localStorage.getItem(syncedKey) || '[]'));
+    POSTS.forEach(p => {
+      if (String(p.id).indexOf('sep26-') !== 0) return;
+      if (SEPT2026_UNQUEUED.indexOf(p.date + '|' + p.time) >= 0) return;
+      already.add(String(p.id));
+    });
+    localStorage.setItem(syncedKey, JSON.stringify([...already]));
+  } catch(e) {}
+  savePosts(); // writes localStorage + upserts the rows to Supabase
 })();
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
