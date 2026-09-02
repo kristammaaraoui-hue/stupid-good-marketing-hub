@@ -9,7 +9,7 @@
 <style>
 :root {
   /* ── Brand colors ── */
-  --green: #00d191;
+  --green: #00d191; --pink: #ff4d9d;
   --purple: #f254fd;
   --red: #ff281f;
   --charcoal: #393939;
@@ -7285,7 +7285,7 @@ function renderWeekView() {
             <div class="cal-pill-top">
               ${platBadge(p.platform, 14)}
               <span class="cal-pill-time">${p.time.replace(' AM','a').replace(' PM','p')}</span>
-              <span class="cal-pill-dot" style="background:${isBlotatoSynced(p.id) ? 'var(--green)' : (stColor[p.status]||'var(--muted2)')};" title="${isBlotatoSynced(p.id) ? 'Synced to Blotato · ' + p.status : p.status}"></span>
+              <span class="cal-pill-dot" style="background:${isBlotatoSynced(p.id) ? 'var(--pink)' : (stColor[p.status]||'var(--muted2)')};" title="${isBlotatoSynced(p.id) ? 'Scheduled in Blotato · ' + p.status : p.status + ' · not in Blotato'}"></span>
             </div>
             <div class="cal-pill-preview">${p.content.replace(/\n/g,' ').substring(0,55)}${p.content.length>55?'…':''}</div>
           </div>`).join('') : `<div style="font-size:10px;color:var(--muted2);text-align:center;padding:14px 4px;opacity:0.4;">—</div>`}
